@@ -5,7 +5,6 @@
 @Contact  : dsj34473@163.com
 '''
 
-import struct
 import hashlib
 import sys
 sys.path.append('.')
@@ -22,6 +21,8 @@ class TRANSACTION(object):
         version: int = VERSION_DEFAULT,
     ) -> None:
         self.lock_time = lock_time
+        if self.lock_time < 0:
+            raise ValueError('Invalid lock_time')
         self.tx_out = tx_out
         self.tx_out_count = compactSize(len(self.tx_out))
         self.tx_in = tx_in
@@ -41,12 +42,12 @@ class TRANSACTION(object):
         version, data = VERSION_SERIALIZE.deserialize(data)
         tx_in_count, data = compactSize.deserialize(data)
         tx_in = []
-        for _ in range(tx_in_count.value):
+        for _ in range(tx_in_count):
             txin, data = TxIn.deserialize(data)
             tx_in.append(txin)
         tx_out_count, data = compactSize.deserialize(data)
         tx_out = []
-        for _ in range(tx_out_count.value):
+        for _ in range(tx_out_count):
             txout, data = TxOut.deserialize(data)
             tx_out.append(txout)
         lock_time, data = LOCK_TIME_SERIALIZE.deserialize(data)
@@ -69,7 +70,7 @@ class TRANSACTION(object):
         string_tx_in = f'[\n\t\t{", ".join(string_tx_in)}\n\t]'
         string_tx_out = [str(txout).replace("\n", "\n\t\t") for txout in self.tx_out]
         string_tx_out = f'[\n\t\t{", ".join(string_tx_out)}\n\t]'
-        return f'transaction: {{\n\t"version:<uint32_t>": {self.version},\n\t"tx_in_count:<compactSize uint>": {self.tx_in_count.value},\n\t"tx_in:<List[TxIn]>": {string_tx_in},\n\t"tx_out_count:<compactSize uint>": {self.tx_out_count.value},\n\t"tx_out:<List[TxOut]>": {string_tx_out},\n\t"lock_time:<uint32_t>": {self.lock_time}\n}}'
+        return f'transaction: {{\n\t"version:<uint32_t>": {self.version},\n\t"tx_in_count:<compactSize uint>": {self.tx_in_count},\n\t"tx_in:<List[TxIn]>": {string_tx_in},\n\t"tx_out_count:<compactSize uint>": {self.tx_out_count},\n\t"tx_out:<List[TxOut]>": {string_tx_out},\n\t"lock_time:<uint32_t>": {self.lock_time}\n}}'
 
     def _hash(self) -> str:
         return hashlib.sha256(
@@ -88,7 +89,7 @@ class TxIn(object):
         self.sequence = SEQUENCE_DEFAULT
         self.signature_script = signature_script
         self.script_bytes = compactSize(len(signature_script))
-        if self.script_bytes.value > MAX_SIGNATURE_SCRIPT_SIZE:
+        if self.script_bytes > MAX_SIGNATURE_SCRIPT_SIZE:
             raise ValueError('Invalid signature_script')
         self.previous_output = previous_output
     
@@ -102,8 +103,8 @@ class TxIn(object):
     def deserialize(data: bytes) -> 'TxIn':
         previous_output, data = outpoint.deserialize(data)
         script_bytes, data = compactSize.deserialize(data)
-        signature_script, data = data[:script_bytes.value], data[script_bytes.value:]
-        if script_bytes.value != len(signature_script):
+        signature_script, data = data[:script_bytes], data[script_bytes:]
+        if script_bytes != len(signature_script):
             raise ValueError('Invalid data')
         sequence, data = SEQUENCE_SERIALIZE.deserialize(data)
         if sequence != SEQUENCE_DEFAULT:
@@ -120,7 +121,7 @@ class TxIn(object):
     
     def __str__(self) -> str:
         string_previous_output = str(self.previous_output).replace('\n', '\n\t')
-        return f'TxIn: {{\n\t"previous_output:<outpoint>": {string_previous_output},\n\t"script_bytes:<compactSize uint>": {self.script_bytes.value},\n\t"signature_script:<binary|script>": {self.signature_script},\n\t"sequence:<uint32_t>": {self.sequence}\n}}'
+        return f'TxIn: {{\n\t"previous_output:<outpoint>": {string_previous_output},\n\t"script_bytes:<compactSize uint>": {int(self.script_bytes)},\n\t"signature_script:<binary|script>": {self.signature_script},\n\t"sequence:<uint32_t>": {self.sequence}\n}}'
 
     def _hash(self) -> str:
         return hashlib.sha256(
@@ -177,7 +178,7 @@ class TxOut(object):
     ) -> None:
         self.pk_script = pk_script
         self.pk_script_bytes = compactSize(len(pk_script))
-        if self.pk_script_bytes.value > MAX_PK_SCRIPT_SIZE:
+        if self.pk_script_bytes > MAX_PK_SCRIPT_SIZE:
             raise ValueError('Invalid pk_script')
         self.value = value
         if self.value < 0:
@@ -191,8 +192,8 @@ class TxOut(object):
     def deserialize(data: bytes) -> 'TxOut':
         value, data = VALUE_SERIALIZE.deserialize(data)
         pk_script_bytes, data = compactSize.deserialize(data)
-        pk_script, data = data[:pk_script_bytes.value], data[pk_script_bytes.value:]
-        if pk_script_bytes.value != len(pk_script):
+        pk_script, data = data[:pk_script_bytes], data[pk_script_bytes:]
+        if pk_script_bytes != len(pk_script):
             raise ValueError('Invalid pk_script')
         return TxOut(
             value=value,
@@ -205,7 +206,7 @@ class TxOut(object):
         )
     
     def __str__(self):
-        return f'TxOut: {{\n\t"value:<uint64_t>": {self.value},\n\t"pk_script_bytes:<compactSize>": {self.pk_script_bytes.value},\n\t"pk_script:<binary|script>": {self.pk_script}\n}}'
+        return f'TxOut: {{\n\t"value:<uint64_t>": {self.value},\n\t"pk_script_bytes:<compactSize>": {int(self.pk_script_bytes)},\n\t"pk_script:<binary|script>": {self.pk_script}\n}}'
 
     def _hash(self) -> str:
         return hashlib.sha256(
@@ -225,7 +226,7 @@ class AuditMission(object):
         self.ATM_script = ATM_script
         self.height = compactSize(height)
         self.script_bytes = compactSize(len(self.ATM_script) + len(self.height))
-        if self.script_bytes.value > MAX_ATM_SCRIPT_SIZE:
+        if self.script_bytes > MAX_ATM_SCRIPT_SIZE:
             raise ValueError('Invalid ATM_script')
         self.index = INDEX_ON_ATM_DEFAULT
         self.hash = '00' * len(HASH_SERIALIZE)
@@ -248,15 +249,15 @@ class AuditMission(object):
             raise ValueError('Invalid data')
         script_bytes, data = compactSize.deserialize(data)
         height, data = compactSize.deserialize(data)
-        ATM_script, sequence, data = SERIALIZE(f'<{script_bytes.value - len(height)}sI').deserialize(data)
+        ATM_script, sequence, data = SERIALIZE(f'<{script_bytes - len(height)}sI').deserialize(data)
         if sequence != SEQUENCE_DEFAULT:
             raise ValueError('Invalid data')
         return AuditMission(
-            height=height.value,
+            height=int(height),
             ATM_script=ATM_script
         ) if not data else (
             AuditMission(
-                height=height.value,
+                height=int(height),
                 ATM_script=ATM_script
             ), data
         )
@@ -267,7 +268,7 @@ class AuditMission(object):
         ).hexdigest()
 
     def __str__(self):
-        return f'Audit-Mission: {{\n\t"hash:<char[32]>": {self.hash},\n\t"index:<uint32_t>": {self.index},\n\t"script_bytes:<compactSize uint>": {self.script_bytes.value},\n\t"height:<Varies>": {self.height.value},\n\t"ATM_script:<binary|script>": {self.ATM_script},\n\t"sequence:<uint32_t>": {self.sequence}\n}}'
+        return f'Audit-Mission: {{\n\t"hash:<char[32]>": {self.hash},\n\t"index:<uint32_t>": {self.index},\n\t"script_bytes:<compactSize uint>": {int(self.script_bytes)},\n\t"height:<Varies>": {int(self.height)},\n\t"ATM_script:<binary|script>": {self.ATM_script},\n\t"sequence:<uint32_t>": {self.sequence}\n}}'
 
     def __len__(self) -> int:
         return len(self.serialize())
@@ -307,8 +308,6 @@ if __name__ == '__main__':
     # 序列化ATM交易
     serialized_audit_mission = audit_mission.serialize()
     print(f'Serialized Audit Mission: {serialized_audit_mission.hex()}')
-
-    print(f'{audit_mission}')
 
     # 反序列化ATM交易
     deserialized_audit_mission = AuditMission.deserialize(serialized_audit_mission)

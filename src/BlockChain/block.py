@@ -36,7 +36,7 @@ class BLOCK(object):
         block_header, data = BlockHeader.deserialize(data)
         txn_count, data = compactSize.deserialize(data)
         txns = []
-        for _ in range(txn_count.value - 1):
+        for _ in range(txn_count - 1):
             txn, data = TRANSACTION.deserialize(data)
             txns.append(txn)
         else:
@@ -59,7 +59,7 @@ class BLOCK(object):
         string_block_header = str(self.block_header).replace('\n', '\n\t')
         string_txns = ", ".join([str(txn).replace('\n', '\n\t\t') for txn in self.txns])
         string_txns = f'[\n\t\t{string_txns}\n\t]'
-        return f'block: {{\n\t"block_header": {string_block_header},\n\t"txn_count": {self.txn_count.value},\n\t"txns": {string_txns}\n}}'   
+        return f'block: {{\n\t"block_header": {string_block_header},\n\t"txn_count": {self.txn_count},\n\t"txns": {string_txns}\n}}'   
 
 # 定义区块头类
 class BlockHeader(object):

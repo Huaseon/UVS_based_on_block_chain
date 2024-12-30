@@ -9,18 +9,21 @@ import struct
 from typing import Any
 
 # compactSize
-class compactSize(object):
-    def __init__(self, value: int):
-        self.value = value
+class compactSize(int):
+    def __new__(cls, value: int) -> 'compactSize':
+        value = int(value)
+        if value < 0:
+            raise ValueError('Invalid compactSize value')
+        return int.__new__(cls, value)
     
     def __len__(self):
-        if self.value < 253:
+        if int(self) < 253:
             return 1
-        elif self.value < 0x10000:
+        elif int(self) < 0x10000:
             return 3
-        elif self.value < 0x100000000:
+        elif int(self) < 0x100000000:
             return 5
-        elif self.value < 0x10000000000000000:
+        elif int(self) < 0x10000000000000000:
             return 9
         else:
             raise ValueError('Invalid compactSize value')
@@ -28,13 +31,13 @@ class compactSize(object):
     def __bytes__(self):
         match len(self):
             case 1:
-                return self.value.to_bytes(1, 'little')
+                return int(self).to_bytes(1, 'little')
             case 3:
-                return b'\xfd' + self.value.to_bytes(2, 'little')
+                return b'\xfd' + int(self).to_bytes(2, 'little')
             case 5:
-                return b'\xfe' + self.value.to_bytes(4, 'little')
+                return b'\xfe' + int(self).to_bytes(4, 'little')
             case 9:
-                return b'\xff' + self.value.to_bytes(8, 'little')
+                return b'\xff' + int(self).to_bytes(8, 'little')
             case _:
                 raise ValueError('Invalid compactSize value')
     
@@ -59,11 +62,18 @@ class compactSize(object):
     def deserialize(data: bytes):
         return compactSize.from_bytes(data)
     
-    def __add__(self, other: any):
-        return compactSize(self.value + (other.value if isinstance(other, compactSize) else other))
+    def __add__(self, other: int) -> 'compactSize':
+        if int(other) < 0:
+            raise ValueError('Invalid compactSize value')
+        return compactSize(int(self) + (int(other) if isinstance(other, compactSize) else other))
     
-    def __repr__(self) -> str:
-        return f'{self.value}'
+    def __sub__(self, other: int) -> 'compactSize':
+        if int(self) < int(other):
+            raise ValueError('Invalid compactSize value')
+        return compactSize(int(self) - (int(other) if isinstance(other, compactSize) else other))
+
+    def __str__(self) -> str:
+        return str(int(self))
 
 # SERIALIZE_FORMAT
 class SERIALIZE(str):
@@ -97,3 +107,4 @@ class SERIALIZE(str):
             str(self),
             data[:len(self)]
         ), data[len(self):]
+    

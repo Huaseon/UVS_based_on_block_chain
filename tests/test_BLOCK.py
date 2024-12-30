@@ -16,12 +16,12 @@ class TestBlock(unittest.TestCase):
 
     def setUp(self):
         self.block_header = BlockHeader(**json_block_header())
-        self.transactions = [TRANSACTION(**json_transaction()) for _ in range(int(time()) % 10)]
+        self.transactions = [TRANSACTION(**json_transaction()) for _ in range(int(time()) % 9 + 1)]
         self.block = BLOCK(self.block_header, self.transactions)
 
     def test_block_initialization(self):
         self.assertEqual(self.block.block_header, self.block_header)
-        self.assertEqual(self.block.txn_count.value, len(self.transactions))
+        self.assertEqual(self.block.txn_count, len(self.transactions))
         self.assertEqual(self.block.txns, self.transactions)
 
     def test_block_serialization(self):
