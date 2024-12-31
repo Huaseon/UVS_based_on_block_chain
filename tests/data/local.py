@@ -7,7 +7,7 @@
 
 import sys
 sys.path.append('.')
-from src.BlockChain.transaction import *
+from src.Transaction.transaction import *
 from src.BlockChain.block import *
 from time import time
 from random import randint
@@ -55,9 +55,12 @@ def json_block():
 
 
 def json_merkle_block():
+    atm = AuditMission(**json_ATM())
+    block_header = BlockHeader(**json_block_header())
+    block_header.merkle_root_hash = atm._hash()
     return {
-        'block_header': BlockHeader(**json_block_header()),
-        'txns': [AuditMission(**json_ATM()), ] + [TRANSACTION(**json_transaction()) for _ in range(int(time()) % 4)],
+        'block_header': block_header,
+        'txns': [atm, ] + [TRANSACTION(**json_transaction()) for _ in range(int(time()) % 4)],
     }
 
 def json_ATM():

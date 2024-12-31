@@ -9,7 +9,7 @@ import sys
 sys.path.append('.')
 import unittest
 from src.BlockChain.block import BLOCK, BlockHeader
-from src.BlockChain.transaction import TRANSACTION
+from src.Transaction.transaction import TRANSACTION
 from tests.data.local import *
 
 class TestBlock(unittest.TestCase):

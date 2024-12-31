@@ -8,7 +8,7 @@
 import sys
 sys.path.append('.')
 import unittest
-from src.BlockChain.transaction import *
+from src.Transaction.transaction import *
 from tests.data.local import *
 
 class TestTransaction(unittest.TestCase):

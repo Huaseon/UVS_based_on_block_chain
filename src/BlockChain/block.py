@@ -11,8 +11,8 @@ sys.path.append('.')
 import hashlib
 from typing import List
 from src.utils.data import compactSize
-from src.BlockChain.transaction import TRANSACTION, AuditMission
-from src.BlockChain.v1.CONFIG import *
+from src.Transaction.transaction import TRANSACTION, AuditMission
+from src.V.v1.CONFIG import *
 
 # 定义区块类
 class BLOCK(object):
@@ -124,6 +124,8 @@ class MerkleBlock(object):
         self.txns = [txns[0]]
         self.merkle_tree = [[1, self.txns[0]._hash(), self.txns[0]._hash()]]
         self.block_header = block_header
+        if self.block_header.merkle_root_hash != self.root():
+            raise ValueError('Invalid block_header, merkle_root_hash')
         for txn in txns[1:]:
             self.update(txn)
 

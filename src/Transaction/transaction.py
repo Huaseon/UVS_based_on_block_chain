@@ -10,7 +10,7 @@ import sys
 sys.path.append('.')
 from typing import List
 from src.utils.data import compactSize
-from src.BlockChain.v1.CONFIG import *
+from src.V.v1.CONFIG import *
 
 # 定义交易类
 class TRANSACTION(object):
