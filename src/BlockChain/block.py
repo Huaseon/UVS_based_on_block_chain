@@ -11,7 +11,7 @@ sys.path.append('.')
 import hashlib
 from typing import List
 from src.utils.data import compactSize
-from src.BlockChain.transaction import TRANSACTION
+from src.BlockChain.transaction import TRANSACTION, AuditMission
 from src.BlockChain.v1.CONFIG import *
 
 # 定义区块类
@@ -112,6 +112,51 @@ class BlockHeader(object):
 
     def __str__(self) -> str:
         return f'block header: {{\n\t"version:<uint332_t>": {self.version},\n\t"previous_block_header_hash:<char[32]>": {self.previous_block_header_hash}\n\t"merkle_root_hash:<char[32]>": {self.merkle_root_hash}\n\t"time:<uint32_t>": {self.time}\n}}'
+
+# 定义默克尔树块类
+class MerkleBlock(object):
+    def __init__(self,
+        block_header: 'BlockHeader',
+        txns: List[TRANSACTION],
+    ) -> None:
+        if len(txns) < 1 or not isinstance(txns[0], AuditMission):
+            raise ValueError('Invalid txns')
+        self.txns = [txns[0]]
+        self.merkle_tree = [[1, self.txns[0]._hash(), self.txns[0]._hash()]]
+        self.block_header = block_header
+        for txn in txns[1:]:
+            self.update(txn)
+
+    def update(self, tx: TRANSACTION) -> None:
+        txid = tx._hash()
+        
+        if txid in self.merkle_tree[0]:
+            return
+        self.txns.append(tx)
+
+        for _ in self.merkle_tree:
+            if _[0] % 2 == 0:
+                _ += [txid, txid]
+            else:
+                _[-1] = txid
+            txid = self.pair_hash(*_[-2:])
+            _[0] += 1
+        else:
+            self.merkle_tree.append([1, txid, txid])
+        
+        self.block_header.merkle_root_hash = self.root()
+
+    def root(self) -> str:
+        return self.merkle_tree[-1][1]
+
+    @staticmethod
+    def pair_hash(a: str, b: str) -> str:
+        return hashlib.sha256(
+                bytes.fromhex(a) + bytes.fromhex(b)
+        ).hexdigest()
+
+    def __len__(self) -> int:
+        return len(self.txns)
 
 if __name__ == '__main__':
     # 模块测试代码
