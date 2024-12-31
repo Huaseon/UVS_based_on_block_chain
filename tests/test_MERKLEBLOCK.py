@@ -8,7 +8,7 @@
 import sys
 sys.path.append('.')
 import unittest
-from src.BlockChain.block import MerkleBlock, BlockHeader
+from src.BlockChain.block import MerkleBlock
 from src.Transaction.transaction import TRANSACTION
 from tests.data.local import json_merkle_block, json_transaction
 
