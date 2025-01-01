@@ -9,7 +9,7 @@ import sys
 sys.path.append('.')
 from hashlib import sha256
 from src.V.v1.CONFIG import *
-from src.utils.data import compactSize
+from src.utils.data import compactSize, FLAGS
 from typing import TypeAlias
 from src.BlockChain.block import BlockHeader
 from src.PeerToPeerNetwork.NetConf.Global import *
@@ -568,6 +568,132 @@ class Mempool(object):
 Mempool_: TypeAlias = EMPTY_
 
 # 定义MerkleBlock消息类
+class MerkleBlock(object):
+    def __init__(self,
+        start_string: bytes | int,
+        block_header: BlockHeader,
+        transaction_count: int,
+        hashes: list[bytes],
+        flags: int
+    ):
+        self.payload = MerkleBlock_(
+            block_header=block_header,
+            transaction_count=transaction_count,
+            hashes=hashes,
+            flags=flags
+        )
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'merkleblock',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+    
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
+
+    @staticmethod
+    def deserialize(data: bytes) -> 'MerkleBlock':
+        message_header, data = MessageHeader.deserialize(data)
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'merkleblock'):
+            raise ValueError('Command name is not merkleblock')
+        payload = MerkleBlock_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        return MerkleBlock(
+            start_string=message_header.start_string,
+            block_header=payload.block_header,
+            transaction_count=payload.transaction_count,
+            hashes=payload.hashes,
+            flags=payload.flags
+        ) if not data else (
+            MerkleBlock(
+                start_string=message_header.start_string,
+                block_header=payload.block_header,
+                transaction_count=payload.transaction_count,
+                hashes=payload.hashes,
+                flags=payload.flags
+            ),
+            data
+        )
+    
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<MerkleBlock_>": {payload}\n}}'
+
+# 定义Payload_MerkleBlock消息类
+class MerkleBlock_(object):
+    def __init__(self,
+        block_header: 'BlockHeader',
+        transaction_count: int,
+        hashes: list[bytes],
+        flags: int
+    ) -> None:
+        self.flags = FLAGS(flags)
+        self.flag_byte_count = compactSize(len(self.flags))
+        self.hashes = hashes
+        self.hash_count = compactSize(len(self.hashes))
+        if self.hash_count != self.flags.bit_count():
+            raise ValueError('Hash count is not equal to flag count')
+        self.transaction_count = compactSize(transaction_count)
+        self.block_header = block_header
+
+    def serialize(self) -> bytes:
+        block_header = self.block_header.serialize()
+        transaction_count = self.transaction_count.serialize()
+        hash_count = self.hash_count.serialize()
+        hashes = b''.join(self.hashes)
+        flag_byte_count = self.flag_byte_count.serialize()
+        flags = self.flags.serialize()
+        return block_header + transaction_count + hash_count + hashes + flag_byte_count + flags
+
+    @staticmethod
+    def deserialize(data: bytes) -> 'MerkleBlock_':
+        block_header, data = BlockHeader.deserialize(data)
+        transaction_count, data = compactSize.deserialize(data)
+        hash_count, data = compactSize.deserialize(data)
+        hashes = []
+        for _ in range(hash_count):
+            hash, data = HASH_SERIALIZE.deserialize(data)
+            hashes.append(hash)
+        flag_byte_count, data = compactSize.deserialize(data)
+        flags = FLAGS.deserialize(data, flag_byte_count)
+        flags, data = flags if isinstance(flags, tuple) else (flags, b'')
+
+        return MerkleBlock_(
+            block_header=block_header,
+            transaction_count=transaction_count,
+            hashes=hashes,
+            flags=flags
+        ) if not data else (
+            MerkleBlock_(
+                block_header=block_header,
+                transaction_count=transaction_count,
+                hashes=hashes,
+                flags=flags
+            ),
+            data
+        )
+
+    def __len__(self) -> int:
+        return len(self.serialize())
+    
+    def __str__(self) -> str:
+        block_header = self.block_header.__str__().replace('\n', '\n\t')
+        transaction_count = compactSize.serialize(self.transaction_count).hex()
+        hash_count = compactSize.serialize(self.hash_count).hex()
+        hashes = '[\n\t' + ',\n\t'.join([hash.hex() for hash in self.hashes]) + '\n]'
+        hashes = hashes.replace('\n', '\n\t')
+        flag_byte_count = compactSize.serialize(self.flag_byte_count).hex()
+        flags = self.flags.serialize().hex()
+        return f'{{\n\t"block_header:<BlockHeader>": {block_header},\n\t"transaction_count:<compactSize uint>": {transaction_count},\n\t"hash_count:<compactSize uint>": {hash_count},\n\t"hashes:<list[bytes]>": {hashes},\n\t"flag_byte_count:<compactSize uint>": {flag_byte_count},\n\t"flags:<FLAGS>": {flags}\n}}'
+
+    def _hash(self) -> bytes:
+        return sha256(self.serialize()).digest()
+
+# 定义Payload_Tx消息类
 
 
 if __name__ == "__main__":
@@ -650,7 +776,21 @@ if __name__ == "__main__":
     # )
     # print(Headers.deserialize(headers.serialize()))
 
-    mempool = Mempool(
-        start_string=START_STRING
+    # mempool = Mempool(
+    #     start_string=START_STRING
+    # )
+    # print(Mempool.deserialize(mempool.serialize()))
+
+    merkle_block = MerkleBlock(
+        start_string=START_STRING,
+        block_header=BlockHeader(
+            version=VERSION_DEFAULT,
+            previous_block_header_hash=sha256(b'').hexdigest(),
+            merkle_root_hash=sha256(b'1').hexdigest(),
+            time=0,
+        ),
+        transaction_count=99,
+        hashes=[sha256(b'').digest(), sha256(b'1').digest(), sha256(b'2').digest(), sha256(b'3').digest()], 
+        flags=0b10111
     )
-    print(Mempool.deserialize(mempool.serialize()))
+    print(MerkleBlock.deserialize(merkle_block.serialize()))
