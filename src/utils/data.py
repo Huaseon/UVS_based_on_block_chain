@@ -88,9 +88,9 @@ class SERIALIZE(str):
     @staticmethod
     def normalize(format: str) -> str:
         format = str(format)
-        if (format)[0] not in SERIALIZE.char and format[0] != '<':
+        if (format)[0] not in SERIALIZE.char and format[0] != '<' and format[0] != '>':
             raise ValueError('Invalid format')
-        return format if format.startswith('<') else '<' + format
+        return format if format.startswith('<') or format.startswith('>') else '<' + format
 
     def __add__(self, other: str) -> 'SERIALIZE':
         other = str(other)
@@ -107,43 +107,3 @@ class SERIALIZE(str):
             str(self),
             data[:len(self)]
         ), data[len(self):]
-
-# FLAGS
-class FLAGS(int):
-    def __new__(cls, flags: int) -> 'FLAGS':
-        return super().__new__(cls, cls.normalize(flags))
-
-    def __init__(self, flags: int) -> None:
-        self.reversed_flags = int(f'{int(self):<0{len(self) * 8}b}'[-1::-1], 2)
-
-    def __bytes__(self) -> bytes:
-        return self.serialize()
-
-    @staticmethod
-    def from_bytes(data: bytes, flag_byte_count: int) -> 'FLAGS':
-        return FLAGS.deserialize(data, flag_byte_count)
-
-    def serialize(self) -> bytes:
-        return self.reversed_flags.to_bytes(len(self), 'big')
-
-    @staticmethod
-    def deserialize(data: bytes, flag_byte_count: int) -> 'FLAGS':
-        reversed_flags = int.from_bytes(data[:flag_byte_count], 'big')
-        flags, data = int(f'{reversed_flags:<0{flag_byte_count * 8}b}'[-1::-1], 2), data[flag_byte_count:]
-        return FLAGS(
-            flags
-        ) if not data else (
-            FLAGS(
-                flags
-            ), data
-        )
-
-    @staticmethod
-    def normalize(flags: int) -> int:
-        if not flags:
-            raise ValueError('Invalid flags')
-        return flags if flags ^ 0 else FLAGS.normalize(flags >> 1)
-
-    def __len__(self) -> int:
-        bit_count = int(self).bit_length()
-        return (bit_count // 8) + (bit_count % 8 != 0)

@@ -9,10 +9,11 @@ import sys
 sys.path.append('.')
 from hashlib import sha256
 from src.V.v1.CONFIG import *
-from src.utils.data import compactSize, FLAGS
+from src.utils.data import compactSize
 from typing import TypeAlias
 from src.BlockChain.block import BlockHeader
 from src.PeerToPeerNetwork.NetConf.Global import *
+from src.Transaction.transaction import TRANSACTION, TxIn, TxOut, outpoint, AuditMission
 
 # 定义消息报头类
 class MessageHeader(object):
@@ -269,7 +270,7 @@ class Inv_(object):
             inventory.append(inv)
         else:
             inv = INVENTORY.deserialize(data)
-            data = data[len(inv):]
+            inv, data = inv if isinstance(inv, tuple) else (inv, b'')
             inventory.append(inv)
         return Inv_(
             inventory=inventory
@@ -693,8 +694,222 @@ class MerkleBlock_(object):
     def _hash(self) -> bytes:
         return sha256(self.serialize()).digest()
 
-# 定义Payload_Tx消息类
+# 定义Tx消息类
+class Tx(object):
+    def __init__(self,
+        start_string: bytes | int,
+        transaction: 'TRANSACTION'
+    ):
+        self.payload = Tx_(
+            transaction=transaction
+        )
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'tx',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+    
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
 
+    @staticmethod
+    def deserialize(data: bytes) -> 'Tx':
+        message_header, data = MessageHeader.deserialize(data)
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'tx'):
+            raise ValueError('Command name is not tx')
+        payload = Tx_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        return Tx(
+            start_string=message_header.start_string,
+            transaction=payload.transaction
+        ) if not data else (
+            Tx(
+                start_string=message_header.start_string,
+                transaction=payload.transaction
+            ),
+            data
+        )
+    
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Tx_>": {payload}\n}}'
+
+# 定义Payload_Tx消息类
+class Tx_(object):
+    def __init__(self,
+        transaction: TRANSACTION
+    ) -> None:
+        self.transaction = transaction
+
+    def serialize(self) -> bytes:
+        return self.transaction.serialize()
+
+    @staticmethod
+    def deserialize(data: bytes) -> 'Tx_':
+        transaction = TRANSACTION.deserialize(data)
+        transaction, data = transaction if isinstance(transaction, tuple) else (transaction, b'')
+        return Tx_(
+            transaction=transaction
+        ) if not data else (
+            Tx_(
+                transaction=transaction
+            ),
+            data
+        )
+
+    def __len__(self) -> int:
+        return len(self.serialize())
+    
+    def __str__(self) -> str:
+        return self.transaction.__str__().replace('\n', '\n\t')
+
+    def _hash(self) -> bytes:
+        return sha256(self.serialize()).digest()
+
+# 定义Notfound消息
+class Notfound(object):
+    def __init__(self,
+        start_string: bytes | int,
+        inventory: list[INVENTORY]
+    ):
+        self.payload = Notfound_(
+            inventory=inventory
+        )
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'notfound',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'Notfound':
+        message_header, data = MessageHeader.deserialize(data)
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'notfound'):
+            raise ValueError('Command name is not notfound')
+        payload = Notfound_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        return Notfound(
+            start_string=message_header.start_string,
+            inventory=payload.inventory
+        ) if not data else (
+            Notfound(
+                start_string=message_header.start_string,
+                inventory=payload.inventory
+            ),
+            data
+        )
+    
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Notfound_>": {payload}\n}}'
+
+
+# 定义Payload_Notfound消息
+Notfound_: TypeAlias = Inv_
+
+# 定义Addr消息
+class Addr(object):
+    def __init__(self,
+         start_string: bytes | int,
+         IP_addresses: list[NetworkIPAddress]        
+    ):
+        self.payload = Addr_(
+            IP_addresses=IP_addresses
+        )
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'addr',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+    
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'Addr':
+        message_header, data = MessageHeader.deserialize(data)
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'addr'):
+            raise ValueError('Command name is not addr')
+        payload = Addr_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        return Addr(
+            start_string=message_header.start_string,
+            IP_addresses=payload.IP_addresses
+        ) if not data else (
+            Addr(
+                start_string=message_header.start_string,
+                IP_addresses=payload.IP_addresses
+            ),
+            data
+        )
+
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Addr_>: {payload}\n}}'
+
+# 定义Payload_Addr消息
+class Addr_(object):
+    def __init__(self,
+        IP_addresses: list[NetworkIPAddress]
+    ):
+        self.IP_addresses = IP_addresses
+        self.IP_address_count = compactSize(len(self.IP_addresses))
+
+    def serialize(self) -> bytes:
+        IP_address_count = compactSize.serialize(self.IP_address_count)
+        IP_addresses = b''.join([IP_address.serialize() for IP_address in self.IP_addresses])
+        return IP_address_count + IP_addresses
+
+    @staticmethod
+    def deserialize(data: bytes) -> 'Addr_':
+        IP_address_count, data = compactSize.deserialize(data)
+        IP_addresses = []
+        for _ in range(IP_address_count - 1):
+            IP_address, data = NetworkIPAddress.deserialize(data)
+            IP_addresses.append(IP_address)
+        else:
+            IP_address = NetworkIPAddress.deserialize(data)
+            IP_address, data = IP_address if isinstance(IP_address, tuple) else (IP_address, b'')
+            IP_addresses.append(IP_address)
+        return Addr_(
+            IP_addresses=IP_addresses
+        ) if not data else (
+            Addr_(
+                IP_addresses=IP_addresses
+            ),
+            data
+        )
+
+    def __len__(self) -> int:
+        return len(self.serialize())
+    
+    def __str__(self) -> str:
+        IP_address_count = compactSize.serialize(self.IP_address_count).hex()
+        IP_addresses = '[\n\t' + ',\n\t'.join([IP_address.__str__().replace('\n', '\n\t') for IP_address in self.IP_addresses]) + '\n]'
+        IP_addresses = IP_addresses.replace('\n', '\n\t')
+        return f'{{\n\t"IP address count:<compactSize uint>": {IP_address_count},\n\t"IP addresses:<list[NetworkIPAddress]>": {IP_addresses}\n}}'
+
+    def _hash(self) -> bytes:
+        return sha256(self.serialize()).digest()
+
+# 定义GetAddr消息
+
+# 定义Payload_GetAddr消息
 
 if __name__ == "__main__":
     # 模块测试
@@ -781,16 +996,67 @@ if __name__ == "__main__":
     # )
     # print(Mempool.deserialize(mempool.serialize()))
 
-    merkle_block = MerkleBlock(
-        start_string=START_STRING,
-        block_header=BlockHeader(
-            version=VERSION_DEFAULT,
-            previous_block_header_hash=sha256(b'').hexdigest(),
-            merkle_root_hash=sha256(b'1').hexdigest(),
-            time=0,
-        ),
-        transaction_count=99,
-        hashes=[sha256(b'').digest(), sha256(b'1').digest(), sha256(b'2').digest(), sha256(b'3').digest()], 
-        flags=0b10111
-    )
-    print(MerkleBlock.deserialize(merkle_block.serialize()))
+    # merkle_block = MerkleBlock(
+    #     start_string=START_STRING,
+    #     block_header=BlockHeader(
+    #         version=VERSION_DEFAULT,
+    #         previous_block_header_hash=sha256(b'').hexdigest(),
+    #         merkle_root_hash=sha256(b'1').hexdigest(),
+    #         time=0,
+    #     ),
+    #     transaction_count=99,
+    #     hashes=[sha256(b'').digest(), sha256(b'1').digest(), sha256(b'2').digest(), sha256(b'3').digest()], 
+    #     flags=0b10111
+    # )
+    # print(MerkleBlock.deserialize(merkle_block.serialize()))
+
+    # tx = Tx(
+    #     start_string=START_STRING,
+    #     transaction=TRANSACTION(
+    #         version=VERSION_DEFAULT,
+    #         tx_in=[
+    #             TxIn(
+    #                 previous_output=outpoint(
+    #                     hash=sha256(b'').hexdigest(),
+    #                     index=0
+    #                 ),
+    #                 signature_script=b''
+    #             )
+    #         ],
+    #         tx_out=[
+    #             TxOut(
+    #                 value=0,
+    #                 pk_script=b''
+    #             )
+    #         ],
+    #         lock_time=0
+    #     )
+    # )
+    # print(Tx.deserialize(tx.serialize()))
+
+    # notfound = Notfound(
+    #     start_string=START_STRING,
+    #     inventory=[
+    #         INVENTORY(
+    #             type_identifier=MSG_WITNESS_BLOCK,
+    #             hash=sha256(b'').digest()
+    #         ), INVENTORY(
+    #             type_identifier=MSG_WITNESS_BLOCK,
+    #             hash=sha256(b'1').digest()
+    #         )
+    #     ]
+    # )
+    # print(Notfound.deserialize(notfound.serialize()))
+
+    # addr = Addr(
+    #     start_string=START_STRING,
+    #     IP_addresses=[
+    #         NetworkIPAddress(
+    #             time=0,
+    #             services=1,
+    #             IP_address=TERMINAL_IP,
+    #             port=TERMINAL_PORT
+    #         )
+    #     ]
+    # )
+    # print(Addr.deserialize(addr.serialize()))
