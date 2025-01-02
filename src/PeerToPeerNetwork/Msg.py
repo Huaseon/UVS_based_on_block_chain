@@ -11,7 +11,7 @@ from hashlib import sha256
 from src.V.v1.CONFIG import *
 from src.utils.data import compactSize
 from typing import TypeAlias
-from src.BlockChain.block import BlockHeader
+from src.BlockChain.block import BLOCK, BlockHeader
 from src.PeerToPeerNetwork.NetConf.Global import *
 from src.Transaction.transaction import TRANSACTION, TxIn, TxOut, outpoint, AuditMission
 
@@ -95,6 +95,87 @@ class INVENTORY(object):
     
     def __len__(self) -> int:
         return len(self.serialize())
+
+# 定义Block消息类
+class Block(object):
+    def __init__(self,
+        start_string: bytes | int,
+        block: BLOCK
+    ):
+        self.payload = Block_(
+            block=block
+        )
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'block',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+    
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'Block':
+        message_header, data = MessageHeader.deserialize(data)
+        
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'block'):
+            raise ValueError('Command name is not block')
+        
+        payload = Block_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        
+        return Block(
+            start_string=message_header.start_string,
+            block=payload.block
+        ) if not data else (
+            Block(
+                start_string=message_header.start_string,
+                block=payload.block
+            ),
+            data
+        )
+    
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Block_>": {payload}\n}}'
+
+# 定义Payload_Block消息类
+class Block_(object):
+    def __init__(self,
+        block: BLOCK
+    ):
+        self.block = block
+    
+    def serialize(self) -> bytes:
+        return self.block.serialize()
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'Block_':
+        block = BLOCK.deserialize(data)
+        block, data = block if isinstance(block, tuple) else (block, b'')
+        return Block_(
+            block=block
+        ) if not data else (
+            Block_(
+                block=block
+            ),
+            data
+        )
+
+    def __len__(self) -> int:
+        return len(self.serialize())
+    
+    def __str__(self) -> str:
+        return self.block.__str__().replace('\n', '\n\t')
+    
+    def _hash(self) -> bytes:
+        return sha256(self.serialize()).digest()
+    
 
 # 定义GetBlocks消息类
 class GetBlocks(object):
@@ -908,155 +989,724 @@ class Addr_(object):
         return sha256(self.serialize()).digest()
 
 # 定义GetAddr消息
+class GetAddr(object):
+    def __init__(self,
+        start_string: bytes | int
+    ):
+        self.payload = GetAddr_()
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'getaddr',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
+
+    @staticmethod
+    def deserialize(data: bytes) -> 'GetAddr':
+        message_header = MessageHeader.deserialize(data)
+        message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
+        
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'getaddr'):
+            raise ValueError('Command name is not getaddr')
+        
+        payload = GetAddr_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        
+        return GetAddr(
+            start_string=message_header.start_string
+        ) if not data else (
+            GetAddr(
+                start_string=message_header.start_string
+            ),
+            data
+        )
+
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<GetAddr_>: {payload}\n}}'
 
 # 定义Payload_GetAddr消息
+GetAddr_: TypeAlias = EMPTY_
+
+# 定义Ping消息
+class Ping(object):
+    def __init__(self,
+        start_string: bytes | int,
+        nonce: int
+    ):
+        self.payload = Ping_(
+            nonce=nonce
+        )
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'ping',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+    
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'Ping':
+        message_header, data = MessageHeader.deserialize(data)
+        
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'ping'):
+            raise ValueError('Command name is not ping')
+        
+        payload = Ping_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        
+        return Ping(
+            start_string=message_header.start_string,
+            nonce=payload.nonce
+        ) if not data else (
+            Ping(
+                start_string=message_header.start_string,
+                nonce=payload.nonce
+            ),
+            data
+        )
+    
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Ping_>: {payload}\n}}'
+
+# 定义Payload_Ping消息
+class Ping_(object):
+    def __init__(self,
+        nonce: int
+    ):
+        self.nonce = nonce
+    
+    def serialize(self) -> bytes:
+        return NONCE_SERIALIZE.serialize(self.nonce)
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'Ping_':
+        nonce, data = NONCE_SERIALIZE.deserialize(data)
+        return Ping_(
+            nonce=nonce
+        ) if not data else (
+            Ping_(
+                nonce=nonce
+            ),
+            data
+        )
+    
+    def __len__(self) -> int:
+        return len(self.serialize())
+    
+    def __str__(self) -> str:
+        return NONCE_SERIALIZE.serialize(self.nonce).hex()
+    
+    def _hash(self) -> bytes:
+        return sha256(self.serialize()).digest()
+
+# 定义Pong消息
+class Pong(object):
+    def __init__(self,
+        start_string: bytes | int,
+        nonce: int        
+    ):
+        self.payload = Pong_(
+            nonce=nonce
+        )
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'pong',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+    
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'Pong':
+        message_header = MessageHeader.deserialize(data)
+        message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
+
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'pong'):
+            raise ValueError('Command name is not pong')
+        
+        payload = Pong_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        
+        return Pong(
+            start_string=message_header.start_string,
+            nonce=payload.nonce
+        ) if not data else (
+            Pong(
+                start_string=message_header.start_string,
+                nonce=payload.nonce
+            ),
+            data
+        )
+    
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Pong_>: {payload}\n}}'
+
+# 定义Payload_Pong消息
+Pong_: TypeAlias = Ping_
+
+# 定义SendHeaders消息
+class SendHeaders(object):
+    def __init__(self,
+        start_string: bytes | int,
+    ):
+        self.payload = SendHeaders_()
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'sendheaders',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+    
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'SendHeaders':
+        message_header = MessageHeader.deserialize(data)
+        message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
+        
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'sendheaders'):
+            raise ValueError('Command name is not sendheaders')
+        
+        payload = SendHeaders_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        
+        return SendHeaders(
+            start_string=message_header.start_string
+        ) if not data else (
+            SendHeaders(
+                start_string=message_header.start_string
+            ),
+            data
+        )
+    
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<SendHeaders_>: {payload}\n}}'
+
+# 定义Payload_SendHeaders消息
+SendHeaders_: TypeAlias = EMPTY_
+
+# 定义VerAck消息
+class VerAck(object):
+    def __init__(self,
+        start_string: bytes | int
+    ):
+        self.payload = VerAck_()
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'verack',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+    
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'VerAck':
+        message_header = MessageHeader.deserialize(data)
+        message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
+        
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'verack'):
+            raise ValueError('Command name is not verack')
+        
+        payload = VerAck_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        
+        return VerAck(
+            start_string=message_header.start_string
+        ) if not data else (
+            VerAck(
+                start_string=message_header.start_string
+            ),
+            data
+        )
+
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<VerAck_>: {payload}\n}}'
+
+# 定义Payload_VerAck消息
+VerAck_: TypeAlias = EMPTY_
+
+# 定义Version消息
+class Version(object):
+    def __init__(self,
+        start_string: bytes | int,
+        version: int,
+        services: int,
+        timestamp: int,
+        addr_recv_services: int,
+        addr_recv_IP_address: str,
+        addr_recv_port: int,
+        addr_trans_services: int,
+        addr_trans_IP_address: str,
+        addr_trans_port: int,
+        nonce: int,
+        start_height: int,
+    ):
+        self.payload = Version_(
+            version=version,
+            services=services,
+            timestamp=timestamp,
+            addr_recv_services=addr_recv_services,
+            addr_recv_IP_address=addr_recv_IP_address,
+            addr_recv_port=addr_recv_port,
+            addr_trans_services=addr_trans_services,
+            addr_trans_IP_address=addr_trans_IP_address,
+            addr_trans_port=addr_trans_port,
+            nonce=nonce,
+            start_height=start_height
+        )
+        self.message_header = MessageHeader(
+            start_string=start_string,
+            command_name=b'version',
+            payload_size=len(self.payload),
+            checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
+        )
+    
+    def serialize(self) -> bytes:
+        return self.message_header.serialize() + self.payload.serialize()
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'Version':
+        message_header, data = MessageHeader.deserialize(data)
+
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'version'):
+            raise ValueError('Command name is not version')
+        
+        payload = Version_.deserialize(data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+        
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        
+        return Version(
+            start_string=message_header.start_string,
+            version=payload.version,
+            services=payload.services,
+            timestamp=payload.timestamp,
+            addr_recv_services=payload.addr_recv_services,
+            addr_recv_IP_address=payload.addr_recv_IP_address,
+            addr_recv_port=payload.addr_recv_port,
+            addr_trans_services=payload.addr_trans_services,
+            addr_trans_IP_address=payload.addr_trans_IP_address,
+            addr_trans_port=payload.addr_trans_port,
+            nonce=payload.nonce,
+            start_height=payload.start_height
+        ) if not data else (
+            Version(
+                start_string=message_header.start_string,
+                version=payload.version,
+                services=payload.services,
+                timestamp=payload.timestamp,
+                addr_recv_services=payload.addr_recv_services,
+                addr_recv_IP_address=payload.addr_recv_IP_address,
+                addr_recv_port=payload.addr_recv_port,
+                addr_trans_services=payload.addr_trans_services,
+                addr_trans_IP_address=payload.addr_trans_IP_address,
+                addr_trans_port=payload.addr_trans_port,
+                nonce=payload.nonce,
+                start_height=payload.start_height
+            ), data
+        )
+    
+    def __str__(self) -> str:
+        message_header = self.message_header.__str__().replace('\n', '\n\t')
+        payload = self.payload.__str__().replace('\n', '\n\t')
+        return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Version_>: {payload}\n}}'
+        
+
+# 定义Payload_Version消息
+class Version_(object):
+    def __init__(self,
+        version: int,
+        services: int,
+        timestamp: int,
+        addr_recv_services: int,
+        addr_recv_IP_address: str,
+        addr_recv_port: int,
+        addr_trans_services: int,
+        addr_trans_IP_address: str,
+        addr_trans_port: int,
+        nonce: int,
+        start_height: int,
+    ):
+        self.start_height = start_height
+        self.nonce = nonce
+        self.addr_trans_port = addr_trans_port
+        self.addr_trans_IP_address = addr_trans_IP_address
+        self.addr_trans_services = addr_trans_services
+        self.addr_recv_port = addr_recv_port
+        self.addr_recv_IP_address = addr_recv_IP_address
+        self.addr_recv_services = addr_recv_services
+        self.timestamp = timestamp
+        self.services = services
+        self.version = version
+    
+    def serialize(self) -> bytes:
+        version = VERSION_SERIALIZE.serialize(self.version)
+        services = SERVICES_SERIALIZE.serialize(self.services)
+        timestamp = TIMESTAMP_SERIALIZE.serialize(self.timestamp)
+        addr_recv_services = SERVICES_SERIALIZE.serialize(self.addr_recv_services)
+        addr_recv_IP_address = IP_SERIALIZE.serialize(self.addr_recv_IP_address)
+        addr_recv_port = PORT_SERIALIZE.serialize(self.addr_recv_port)
+        addr_trans_services = SERVICES_SERIALIZE.serialize(self.addr_trans_services)
+        addr_trans_IP_address = IP_SERIALIZE.serialize(self.addr_trans_IP_address)
+        addr_trans_port = PORT_SERIALIZE.serialize(self.addr_trans_port)
+        nonce = NONCE_SERIALIZE.serialize(self.nonce)
+        start_height = START_HEIGHT_SERIALIZE.serialize(self.start_height)
+        return version + services + timestamp \
+            + addr_recv_services + addr_recv_IP_address + addr_recv_port \
+            + addr_trans_services + addr_trans_IP_address + addr_trans_port \
+            + nonce + start_height
+    
+    @staticmethod
+    def deserialize(data: bytes) -> 'Version_':
+        version, data = VERSION_SERIALIZE.deserialize(data)
+        services, data = SERVICES_SERIALIZE.deserialize(data)
+        timestamp, data = TIMESTAMP_SERIALIZE.deserialize(data)
+        addr_recv_services, data = SERVICES_SERIALIZE.deserialize(data)
+        addr_recv_IP_address, data = IP_SERIALIZE.deserialize(data)
+        addr_recv_port, data = PORT_SERIALIZE.deserialize(data)
+        addr_trans_services, data = SERVICES_SERIALIZE.deserialize(data)
+        addr_trans_IP_address, data = IP_SERIALIZE.deserialize(data)
+        addr_trans_port, data = PORT_SERIALIZE.deserialize(data)
+        nonce, data = NONCE_SERIALIZE.deserialize(data)
+        start_height, data = START_HEIGHT_SERIALIZE.deserialize(data)
+        return Version_(
+            version=version,
+            services=services,
+            timestamp=timestamp,
+            addr_recv_services=addr_recv_services,
+            addr_recv_IP_address=addr_recv_IP_address,
+            addr_recv_port=addr_recv_port,
+            addr_trans_services=addr_trans_services,
+            addr_trans_IP_address=addr_trans_IP_address,
+            addr_trans_port=addr_trans_port,
+            nonce=nonce,
+            start_height=start_height
+        ) if not data else (
+            Version_(
+                version=version,
+                services=services,
+                timestamp=timestamp,
+                addr_recv_services=addr_recv_services,
+                addr_recv_IP_address=addr_recv_IP_address,
+                addr_recv_port=addr_recv_port,
+                addr_trans_services=addr_trans_services,
+                addr_trans_IP_address=addr_trans_IP_address,
+                addr_trans_port=addr_trans_port,
+                nonce=nonce,
+                start_height=start_height
+            ), data
+        )
+
+    def __len__(self) -> int:
+        return len(self.serialize())
+    
+    def _hash(self) -> bytes:
+        return sha256(self.serialize()).digest()
+    
+    def __str__(self) -> str:
+        version = VERSION_SERIALIZE.serialize(self.version).hex()
+        services = SERVICES_SERIALIZE.serialize(self.services).hex()
+        timestamp = TIMESTAMP_SERIALIZE.serialize(self.timestamp).hex()
+        addr_recv_services = SERVICES_SERIALIZE.serialize(self.addr_recv_services).hex()
+        addr_recv_IP_address = IP_SERIALIZE.serialize(self.addr_recv_IP_address).hex()
+        addr_recv_port = PORT_SERIALIZE.serialize(self.addr_recv_port).hex()
+        addr_trans_services = SERVICES_SERIALIZE.serialize(self.addr_trans_services).hex()
+        addr_trans_IP_address = IP_SERIALIZE.serialize(self.addr_trans_IP_address).hex()
+        addr_trans_port = PORT_SERIALIZE.serialize(self.addr_trans_port).hex()
+        nonce = NONCE_SERIALIZE.serialize(self.nonce).hex()
+        start_height = START_HEIGHT_SERIALIZE.serialize(self.start_height).hex()
+        return f'''{{\n\t"version:<uint32_t>": {version},\n\t"services:<uint64_t>": {services},\n\t"timestamp:<uint64_t>": {timestamp}\
+            ,\n\t"addr_recv_services:<uint64_t>": {addr_recv_services},\n\t"addr_recv_IP_address:<char[16]>": {addr_recv_IP_address},\n\t"addr_recv_port:<uint16_t>": {addr_recv_port}\
+            ,\n\t"addr_trans_services:<uint64_t>": {addr_trans_services},\n\t"addr_trans_IP_address:<char[16]>": {addr_trans_IP_address},\n\t"addr_trans_port:<uint16_t>": {addr_trans_port}\
+            ,\n\t"conce:<uint64_t>": {nonce},\n\t"start_height:<uint32_t>": {start_height}\n}}'''
+
 
 if __name__ == "__main__":
     # 模块测试
     from src.PeerToPeerNetwork.NetConf.LocalNet import *
-    # msg_header = MessageHeader(
-    #     start_string=START_STRING,
-    #     command_name=b'block',
-    #     payload_size=32,
-    #     checksum=b'1234'
-    # )
-    # print(MessageHeader.deserialize(msg_header.serialize()))
+    msg_header = MessageHeader(
+        start_string=START_STRING,
+        command_name=b'block',
+        payload_size=32,
+        checksum=b'1234'
+    )
+    print(MessageHeader.deserialize(msg_header.serialize()))
     
-    # inv = INVENTORY(
-    #     type_identifier=MSG_WITNESS_BLOCK,
-    #     hash=sha256(b'').digest()
-    # )
-    # print(INVENTORY.deserialize(inv.serialize()))
+    inv = INVENTORY(
+        type_identifier=MSG_WITNESS_BLOCK,
+        hash=sha256(b'').digest()
+    )
+    print(INVENTORY.deserialize(inv.serialize()))
 
-    # get_blocks = GetBlocks(
-    #     start_string=START_STRING,
-    #     version=VERSION_DEFAULT,
-    #     block_header_hashes=[sha256(b'').digest(), sha256(b'1').digest()],
-    #     stop_hash=sha256(b'').digest()
-    # )
+    block = Block(
+        start_string=START_STRING,
+        block=BLOCK(
+            block_header=BlockHeader(
+                version=VERSION_DEFAULT,
+                previous_block_header_hash=sha256(b'').hexdigest(),
+                merkle_root_hash=sha256(b'1').hexdigest(),
+                time=0,
+            ),
+            txns=[
+                TRANSACTION(
+                    version=VERSION_DEFAULT,
+                    tx_in=[
+                        TxIn(
+                            previous_output=outpoint(
+                                hash=sha256(b'').hexdigest(),
+                                index=0
+                            ),
+                            signature_script=b''
+                        ), TxIn(
+                            previous_output=outpoint(
+                                hash=sha256(b'1').hexdigest(),
+                                index=0
+                            ),
+                            signature_script=b''
+                        )
+                    ],
+                    tx_out=[
+                        TxOut(
+                            value=0,
+                            pk_script=b''
+                        )
+                    ],
+                    lock_time=0
+                ), TRANSACTION(
+                    version=VERSION_DEFAULT,
+                    tx_in=[
+                        TxIn(
+                            previous_output=outpoint(
+                                hash=sha256(b'2').hexdigest(),
+                                index=0
+                            ),
+                            signature_script=b''
+                        )
+                    ],
+                    tx_out=[
+                        TxOut(
+                            value=1,
+                            pk_script=b''
+                        ), TxOut(
+                            value=2,
+                            pk_script=b''
+                        )
+                    ],
+                    lock_time=0
+                )
+            ]
+        )    
+    )
+    print(Block.deserialize(block.serialize()))
 
-    # print(GetBlocks.deserialize(get_blocks.serialize()))
+    get_blocks = GetBlocks(
+        start_string=START_STRING,
+        version=VERSION_DEFAULT,
+        block_header_hashes=[sha256(b'').digest(), sha256(b'1').digest()],
+        stop_hash=sha256(b'').digest()
+    )
 
-    # inv = Inv(
-    #     start_string=START_STRING,
-    #     inventory=[
-    #         INVENTORY(
-    #             type_identifier=MSG_WITNESS_BLOCK,
-    #             hash=sha256(b'').digest()
-    #         ), INVENTORY(
-    #             type_identifier=MSG_WITNESS_BLOCK,
-    #             hash=sha256(b'1').digest()
-    #         )
-    #     ]
-    # )
-    # print(Inv.deserialize(inv.serialize()))
+    print(GetBlocks.deserialize(get_blocks.serialize()))
 
-    # get_data = GetData(
-    #     start_string=START_STRING,
-    #     inventory=[
-    #         INVENTORY(
-    #             type_identifier=MSG_WITNESS_BLOCK,
-    #             hash=sha256(b'').digest()
-    #         ), INVENTORY(
-    #             type_identifier=MSG_WITNESS_BLOCK,
-    #             hash=sha256(b'1').digest()
-    #         )
-    #     ]
-    # )
-    # print(GetData.deserialize(get_data.serialize()))
+    inv = Inv(
+        start_string=START_STRING,
+        inventory=[
+            INVENTORY(
+                type_identifier=MSG_WITNESS_BLOCK,
+                hash=sha256(b'').digest()
+            ), INVENTORY(
+                type_identifier=MSG_WITNESS_BLOCK,
+                hash=sha256(b'1').digest()
+            )
+        ]
+    )
+    print(Inv.deserialize(inv.serialize()))
 
-    # get_headers = GetHeaders(
-    #     start_string=START_STRING,
-    #     version=VERSION_DEFAULT,
-    #     block_header_hashes=[sha256(b'').digest(), sha256(b'1').digest()],
-    #     stop_hash=sha256(b'').digest()
-    # )
-    # print(GetHeaders.deserialize(get_headers.serialize()))
+    get_data = GetData(
+        start_string=START_STRING,
+        inventory=[
+            INVENTORY(
+                type_identifier=MSG_WITNESS_BLOCK,
+                hash=sha256(b'').digest()
+            ), INVENTORY(
+                type_identifier=MSG_WITNESS_BLOCK,
+                hash=sha256(b'1').digest()
+            )
+        ]
+    )
+    print(GetData.deserialize(get_data.serialize()))
 
-    # headers = Headers(
-    #     start_string=START_STRING,
-    #     headers=[
-    #         BlockHeader(
-    #             version=VERSION_DEFAULT,
-    #             previous_block_header_hash=sha256(b'').hexdigest(),
-    #             merkle_root_hash=sha256(b'1').hexdigest(),
-    #             time=0,
-    #         ), BlockHeader(
-    #             version=VERSION_DEFAULT,
-    #             previous_block_header_hash=sha256(b'1').hexdigest(),
-    #             merkle_root_hash=sha256(b'').hexdigest(),
-    #             time=1,
-    #         )
-    #     ]
-    # )
-    # print(Headers.deserialize(headers.serialize()))
+    get_headers = GetHeaders(
+        start_string=START_STRING,
+        version=VERSION_DEFAULT,
+        block_header_hashes=[sha256(b'').digest(), sha256(b'1').digest()],
+        stop_hash=sha256(b'').digest()
+    )
+    print(GetHeaders.deserialize(get_headers.serialize()))
 
-    # mempool = Mempool(
-    #     start_string=START_STRING
-    # )
-    # print(Mempool.deserialize(mempool.serialize()))
+    headers = Headers(
+        start_string=START_STRING,
+        headers=[
+            BlockHeader(
+                version=VERSION_DEFAULT,
+                previous_block_header_hash=sha256(b'').hexdigest(),
+                merkle_root_hash=sha256(b'1').hexdigest(),
+                time=0,
+            ), BlockHeader(
+                version=VERSION_DEFAULT,
+                previous_block_header_hash=sha256(b'1').hexdigest(),
+                merkle_root_hash=sha256(b'').hexdigest(),
+                time=1,
+            )
+        ]
+    )
+    print(Headers.deserialize(headers.serialize()))
 
-    # merkle_block = MerkleBlock(
-    #     start_string=START_STRING,
-    #     block_header=BlockHeader(
-    #         version=VERSION_DEFAULT,
-    #         previous_block_header_hash=sha256(b'').hexdigest(),
-    #         merkle_root_hash=sha256(b'1').hexdigest(),
-    #         time=0,
-    #     ),
-    #     transaction_count=99,
-    #     hashes=[sha256(b'').digest(), sha256(b'1').digest(), sha256(b'2').digest(), sha256(b'3').digest()], 
-    #     flags=0b10111
-    # )
-    # print(MerkleBlock.deserialize(merkle_block.serialize()))
+    mempool = Mempool(
+        start_string=START_STRING
+    )
+    print(Mempool.deserialize(mempool.serialize()))
 
-    # tx = Tx(
-    #     start_string=START_STRING,
-    #     transaction=TRANSACTION(
-    #         version=VERSION_DEFAULT,
-    #         tx_in=[
-    #             TxIn(
-    #                 previous_output=outpoint(
-    #                     hash=sha256(b'').hexdigest(),
-    #                     index=0
-    #                 ),
-    #                 signature_script=b''
-    #             )
-    #         ],
-    #         tx_out=[
-    #             TxOut(
-    #                 value=0,
-    #                 pk_script=b''
-    #             )
-    #         ],
-    #         lock_time=0
-    #     )
-    # )
-    # print(Tx.deserialize(tx.serialize()))
+    merkle_block = MerkleBlock(
+        start_string=START_STRING,
+        block_header=BlockHeader(
+            version=VERSION_DEFAULT,
+            previous_block_header_hash=sha256(b'').hexdigest(),
+            merkle_root_hash=sha256(b'1').hexdigest(),
+            time=0,
+        ),
+        transaction_count=99,
+        hashes=[sha256(b'').digest(), sha256(b'1').digest(), sha256(b'2').digest(), sha256(b'3').digest()], 
+        flags=0b10111
+    )
+    print(MerkleBlock.deserialize(merkle_block.serialize()))
 
-    # notfound = Notfound(
-    #     start_string=START_STRING,
-    #     inventory=[
-    #         INVENTORY(
-    #             type_identifier=MSG_WITNESS_BLOCK,
-    #             hash=sha256(b'').digest()
-    #         ), INVENTORY(
-    #             type_identifier=MSG_WITNESS_BLOCK,
-    #             hash=sha256(b'1').digest()
-    #         )
-    #     ]
-    # )
-    # print(Notfound.deserialize(notfound.serialize()))
+    tx = Tx(
+        start_string=START_STRING,
+        transaction=TRANSACTION(
+            version=VERSION_DEFAULT,
+            tx_in=[
+                TxIn(
+                    previous_output=outpoint(
+                        hash=sha256(b'').hexdigest(),
+                        index=0
+                    ),
+                    signature_script=b''
+                )
+            ],
+            tx_out=[
+                TxOut(
+                    value=0,
+                    pk_script=b''
+                )
+            ],
+            lock_time=0
+        )
+    )
+    print(Tx.deserialize(tx.serialize()))
 
-    # addr = Addr(
-    #     start_string=START_STRING,
-    #     IP_addresses=[
-    #         NetworkIPAddress(
-    #             time=0,
-    #             services=1,
-    #             IP_address=TERMINAL_IP,
-    #             port=TERMINAL_PORT
-    #         )
-    #     ]
-    # )
-    # print(Addr.deserialize(addr.serialize()))
+    notfound = Notfound(
+        start_string=START_STRING,
+        inventory=[
+            INVENTORY(
+                type_identifier=MSG_WITNESS_BLOCK,
+                hash=sha256(b'').digest()
+            ), INVENTORY(
+                type_identifier=MSG_WITNESS_BLOCK,
+                hash=sha256(b'1').digest()
+            )
+        ]
+    )
+    print(Notfound.deserialize(notfound.serialize()))
+
+    addr = Addr(
+        start_string=START_STRING,
+        IP_addresses=[
+            NetworkIPAddress(
+                time=0,
+                services=NODE_NETWORK,
+                IP_address=TERMINAL_IP,
+                port=TERMINAL_PORT
+            )
+        ]
+    )
+    print(Addr.deserialize(addr.serialize()))
+
+    get_addr = GetAddr(
+        start_string=START_STRING
+    )
+    print(GetAddr.deserialize(get_addr.serialize()))
+
+    ping = Ping(
+        start_string=START_STRING,
+        nonce=0
+    )
+    print(Ping.deserialize(ping.serialize()))
+    
+    pong = Pong(
+        start_string=START_STRING,
+        nonce=0
+    )
+    print(Pong.deserialize(pong.serialize()))
+
+    send_headers = SendHeaders(
+        start_string=START_STRING
+    )
+    print(SendHeaders.deserialize(send_headers.serialize()))
+
+    verack = VerAck(
+        start_string=START_STRING
+    )
+    print(VerAck.deserialize(verack.serialize()))
+
+    version = Version(
+        start_string=START_STRING,
+        version=VERSION_DEFAULT,
+        services=NODE_NETWORK,
+        timestamp=0,
+        addr_recv_services=1,
+        addr_recv_IP_address=TERMINAL_IP,
+        addr_recv_port=TERMINAL_PORT,
+        addr_trans_services=NODE_NETWORK,
+        addr_trans_IP_address=LOCAL_IP,
+        addr_trans_port=next(LOCAL_PORT),
+        nonce=0,
+        start_height=0
+    )
+    print(Version.deserialize(version.serialize()))

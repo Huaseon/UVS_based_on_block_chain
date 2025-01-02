@@ -67,11 +67,11 @@ class TRANSACTION(object):
         )
     
     def __str__(self) -> str:
-        string_tx_in = [str(txin).replace("\n", "\n\t\t") for txin in self.tx_in]
-        string_tx_in = f'[\n\t\t{", ".join(string_tx_in)}\n\t]'
-        string_tx_out = [str(txout).replace("\n", "\n\t\t") for txout in self.tx_out]
-        string_tx_out = f'[\n\t\t{", ".join(string_tx_out)}\n\t]'
-        return f'transaction: {{\n\t"version:<uint32_t>": {self.version},\n\t"tx_in_count:<compactSize uint>": {self.tx_in_count},\n\t"tx_in:<List[TxIn]>": {string_tx_in},\n\t"tx_out_count:<compactSize uint>": {self.tx_out_count},\n\t"tx_out:<List[TxOut]>": {string_tx_out},\n\t"lock_time:<uint32_t>": {self.lock_time}\n}}'
+        string_tx_in = '[\n\t' + ',\n\t'.join([str(txin).replace('\n', '\n\t') for txin in self.tx_in]) + '\n]'
+        string_tx_in = string_tx_in.replace("\n", "\n\t")
+        string_tx_out = '[\n\t' + ', '.join([str(txout).replace('\n', '\n\t') for txout in self.tx_out]) + '\n]'
+        string_tx_out = string_tx_out.replace("\n", "\n\t")
+        return f'{{\n\t"version:<uint32_t>": {self.version},\n\t"tx_in_count:<compactSize uint>": {self.tx_in_count},\n\t"tx_in:<List[TxIn]>": {string_tx_in},\n\t"tx_out_count:<compactSize uint>": {self.tx_out_count},\n\t"tx_out:<List[TxOut]>": {string_tx_out},\n\t"lock_time:<uint32_t>": {self.lock_time}\n}}'
 
     def _hash(self) -> str:
         return hashlib.sha256(
@@ -122,7 +122,7 @@ class TxIn(object):
     
     def __str__(self) -> str:
         string_previous_output = str(self.previous_output).replace('\n', '\n\t')
-        return f'TxIn: {{\n\t"previous_output:<outpoint>": {string_previous_output},\n\t"script_bytes:<compactSize uint>": {int(self.script_bytes)},\n\t"signature_script:<binary|script>": {self.signature_script},\n\t"sequence:<uint32_t>": {self.sequence}\n}}'
+        return f'{{\n\t"previous_output:<outpoint>": {string_previous_output},\n\t"script_bytes:<compactSize uint>": {int(self.script_bytes)},\n\t"signature_script:<binary|script>": {self.signature_script},\n\t"sequence:<uint32_t>": {self.sequence}\n}}'
 
     def _hash(self) -> str:
         return hashlib.sha256(
@@ -161,7 +161,7 @@ class outpoint(object):
         )
     
     def __str__(self):
-        return f'outpoint: {{\n\t"hash:<char[32]>": {self.hash},\n\t"index:<uint32_t>": {self.index}\n}}'
+        return f'{{\n\t"hash:<char[32]>": {self.hash},\n\t"index:<uint32_t>": {self.index}\n}}'
 
     def _hash(self) -> str:
         return hashlib.sha256(
@@ -207,7 +207,7 @@ class TxOut(object):
         )
     
     def __str__(self):
-        return f'TxOut: {{\n\t"value:<uint64_t>": {self.value},\n\t"pk_script_bytes:<compactSize>": {int(self.pk_script_bytes)},\n\t"pk_script:<binary|script>": {self.pk_script}\n}}'
+        return f'{{\n\t"value:<uint64_t>": {self.value},\n\t"pk_script_bytes:<compactSize>": {int(self.pk_script_bytes)},\n\t"pk_script:<binary|script>": {self.pk_script}\n}}'
 
     def _hash(self) -> str:
         return hashlib.sha256(
