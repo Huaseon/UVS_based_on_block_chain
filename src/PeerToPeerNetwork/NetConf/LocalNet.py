@@ -7,6 +7,7 @@
 
 import sys
 sys.path.append('.')
+import socket
 
 '''
 本地网络配置
@@ -14,10 +15,10 @@ sys.path.append('.')
 # 起始字符串
 START_STRING = 0xfabfb5da
 
-# 数据顶端IP地址
-DATA_IP = '127.0.0.1'
-# 数据顶端端口号
-DATA_PORT = 60001
+# 顶点IP地址
+TOP_IP = '127.0.0.1'
+# 顶点端口号
+TOP_PORT = 60001
 
 # 终端IP地址
 TERMINAL_IP = '127.0.0.1'
