@@ -9,7 +9,6 @@ import sys
 sys.path.append('.')
 from src.utils.data import SERIALIZE
 import struct
-from abc import ABC, abstractmethod
 
 # 哈希（散列）序列化
 HASH_SERIALIZE = SERIALIZE('<32s')
@@ -87,6 +86,24 @@ NODE_NETWORK_LIMITED = 0x20
 
 # 端口序列化
 PORT_SERIALIZE = SERIALIZE('>H')
+
+COMMAND_NAME_BLOCK = b'block'
+COMMAND_NAME_GETBLOCKS = b'getblocks'
+COMMAND_NAME_GETDATA = b'getdata'
+COMMAND_NAME_GETHEADERS = b'getheaders'
+COMMAND_NAME_HEADERS = b'headers'
+COMMAND_NAME_INV = b'inv'
+COMMAND_NAME_MEMPOOL = b'mempool'
+COMMAND_NAME_MERKLEBLOCK = b'merkleblock'
+COMMAND_NAME_TX = b'tx'
+COMMAND_NAME_NOTFOUND = b'notfound'
+COMMAND_NAME_ADDR = b'addr'
+COMMAND_NAME_GETADDR = b'getaddr'
+COMMAND_NAME_PING = b'ping'
+COMMAND_NAME_PONG = b'pong'
+COMMAND_NAME_SENDHEADERS = b'sendheaders'
+COMMAND_NAME_VERACK = b'verack'
+COMMAND_NAME_VERSION = b'version'
 
 
     

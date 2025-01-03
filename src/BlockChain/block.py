@@ -113,19 +113,15 @@ class BlockHeader(object):
     def __str__(self) -> str:
         return f'block header: {{\n\t"version:<uint332_t>": {self.version},\n\t"previous_block_header_hash:<char[32]>": {self.previous_block_header_hash}\n\t"merkle_root_hash:<char[32]>": {self.merkle_root_hash}\n\t"time:<uint32_t>": {self.time}\n}}'
 
-# 定义默克尔树块类
-class MerkleBlock(object):
+# 定义默克尔树类
+class MerkleTree(object):
     def __init__(self,
-        block_header: 'BlockHeader',
         txns: List[TRANSACTION],
     ) -> None:
         if len(txns) < 1 or not isinstance(txns[0], AuditMission):
             raise ValueError('Invalid txns')
         self.txns = [txns[0]]
         self.merkle_tree = [[1, self.txns[0]._hash(), self.txns[0]._hash()]]
-        self.block_header = block_header
-        if self.block_header.merkle_root_hash != self.root():
-            raise ValueError('Invalid block_header, merkle_root_hash')
         for txn in txns[1:]:
             self.update(txn)
 
@@ -146,8 +142,6 @@ class MerkleBlock(object):
         else:
             self.merkle_tree.append([1, txid, txid])
         
-        self.block_header.merkle_root_hash = self.root()
-
     def root(self) -> str:
         return self.merkle_tree[-1][1]
 

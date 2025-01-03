@@ -29,8 +29,8 @@ class MSG(ABC):
     def serialize(self) -> bytes:
         pass
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def deserialize(data: bytes) -> 'MSG':
         pass
 
@@ -49,8 +49,8 @@ class PAYLOAD(ABC):
     def serialize(self) -> bytes:
         pass
     
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def deserialize(data: bytes) -> 'PAYLOAD':
         pass
     
@@ -65,6 +65,72 @@ class PAYLOAD(ABC):
     @abstractmethod
     def _hash(self) -> bytes:
         pass
+
+    # @abstractmethod
+    # def act(self, client: 'CLIENT') -> None:
+    #     pass
+
+    @staticmethod
+    def toPayload(data: bytes) -> 'PAYLOAD':
+        message_header = MessageHeader.deserialize(data)
+        message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
+        payload = PAYLOAD._payload(message_header.command_name, data)
+        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
+
+        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        
+        return payload if not data else (
+            payload,
+            data
+        )
+    
+    @staticmethod
+    def _payload(
+        command_name: bytes,
+        data: bytes
+    ) -> 'PAYLOAD':
+        match command_name:
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_BLOCK):
+                return Block.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETBLOCKS):
+                return GetBlocks.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_INV):
+                return Inv.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETDATA):
+                return GetData.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETHEADERS):
+                return GetHeaders.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_HEADERS):
+                return Headers.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_MERKLEBLOCK):
+                return MerkleBlock.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_MEMPOOL):
+                return Mempool.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_TX):
+                return TRANSACTION.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_NOTFOUND):
+                return Notfound.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_ADDR):
+                return Addr.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETADDR):
+                return GetAddr.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_PING):
+                return Ping.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_PONG):
+                return Pong.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_SENDHEADERS):
+                return SendHeaders.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_VERACK):
+                return VerAck.deserialize(data)
+            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_VERSION):
+                return Version.deserialize(data)
+            case _:
+                raise ValueError('Command name is not correct')
+        
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'block'):
+            raise ValueError('Command name is not block')
+        
 
 # 定义消息报头类
 class MessageHeader(object):
@@ -159,7 +225,7 @@ class Block(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'block',
+            command_name=COMMAND_NAME_BLOCK,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -171,7 +237,7 @@ class Block(MSG):
     def deserialize(data: bytes) -> 'Block':
         message_header, data = MessageHeader.deserialize(data)
         
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'block'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_BLOCK):
             raise ValueError('Command name is not block')
         
         payload = Block_.deserialize(data)
@@ -228,6 +294,10 @@ class Block_(PAYLOAD):
     def _hash(self) -> bytes:
         return sha256(self.serialize()).digest()
     
+    def act(self, client: 'CLIENT') -> None:
+        client.blockchain.add_block(self.block)
+        client.logger.info(f'Added a block with height {self.block.header.height} into the blockchain')
+    
 
 # 定义GetBlocks消息类
 class GetBlocks(MSG):
@@ -244,7 +314,7 @@ class GetBlocks(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'getblocks',
+            command_name=COMMAND_NAME_GETBLOCKS,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -255,7 +325,7 @@ class GetBlocks(MSG):
     @staticmethod
     def deserialize(data: bytes) -> 'GetBlocks':
         message_header, data = MessageHeader.deserialize(data)
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'getblocks'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETBLOCKS):
             raise ValueError('Command name is not getblocks')
         payload = GetBlocks_.deserialize(data)
         payload, data = payload if isinstance(payload, tuple) else (payload, b'')
@@ -348,7 +418,7 @@ class Inv(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'inv',
+            command_name=COMMAND_NAME_INV,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -359,7 +429,7 @@ class Inv(MSG):
     @staticmethod
     def deserialize(data: bytes) -> 'Inv':
         message_header, data = MessageHeader.deserialize(data)
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'inv'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_INV):
             raise ValueError('Command name is not inv')
         payload = Inv_.deserialize(data)
         payload, data = payload if isinstance(payload, tuple) else (payload, b'')
@@ -437,7 +507,7 @@ class GetData(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'getdata',
+            command_name=COMMAND_NAME_GETDATA,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -449,7 +519,7 @@ class GetData(MSG):
     def deserialize(data: bytes) -> 'GetData':
         message_header, data = MessageHeader.deserialize(data)
         
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'getdata'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETDATA):
             raise ValueError('Command name is not getdata')
         
         payload = GetData_.deserialize(data)
@@ -492,7 +562,7 @@ class GetHeaders(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'getheaders',
+            command_name=COMMAND_NAME_GETHEADERS,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -504,7 +574,7 @@ class GetHeaders(MSG):
     def deserialize(data: bytes) -> 'GetHeaders':
         message_header, data = MessageHeader.deserialize(data)
         
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'getheaders'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETHEADERS):
             raise ValueError('Command name is not getheaders')
          
         payload = GetHeaders_.deserialize(data)
@@ -547,7 +617,7 @@ class Headers(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'headers',
+            command_name=COMMAND_NAME_HEADERS,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -559,7 +629,7 @@ class Headers(MSG):
     def deserialize(data: bytes) -> 'Headers':
         message_header, data = MessageHeader.deserialize(data)
         
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'headers'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_HEADERS):
             raise ValueError('Command name is not headers')
         
         payload = Headers_.deserialize(data)
@@ -662,7 +732,7 @@ class Mempool(MSG):
         self.payload = Mempool_()
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'mempool',
+            command_name=COMMAND_NAME_MEMPOOL,
             payload_size=0,
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -675,7 +745,7 @@ class Mempool(MSG):
         message_header = MessageHeader.deserialize(data)
         message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
         
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'mempool'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_MEMPOOL):
             raise ValueError('Command name is not mempool')
         
         payload = Mempool_.deserialize(data)
@@ -718,7 +788,7 @@ class MerkleBlock(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'merkleblock',
+            command_name=COMMAND_NAME_MERKLEBLOCK,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -729,7 +799,7 @@ class MerkleBlock(MSG):
     @staticmethod
     def deserialize(data: bytes) -> 'MerkleBlock':
         message_header, data = MessageHeader.deserialize(data)
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'merkleblock'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_MERKLEBLOCK):
             raise ValueError('Command name is not merkleblock')
         payload = MerkleBlock_.deserialize(data)
         payload, data = payload if isinstance(payload, tuple) else (payload, b'')
@@ -838,7 +908,7 @@ class Tx(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'tx',
+            command_name=COMMAND_NAME_TX,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -849,7 +919,7 @@ class Tx(MSG):
     @staticmethod
     def deserialize(data: bytes) -> 'Tx':
         message_header, data = MessageHeader.deserialize(data)
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'tx'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_TX):
             raise ValueError('Command name is not tx')
         payload = Tx_.deserialize(data)
         payload, data = payload if isinstance(payload, tuple) else (payload, b'')
@@ -914,7 +984,7 @@ class Notfound(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'notfound',
+            command_name=COMMAND_NAME_NOTFOUND,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -925,7 +995,7 @@ class Notfound(MSG):
     @staticmethod
     def deserialize(data: bytes) -> 'Notfound':
         message_header, data = MessageHeader.deserialize(data)
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'notfound'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_NOTFOUND):
             raise ValueError('Command name is not notfound')
         payload = Notfound_.deserialize(data)
         payload, data = payload if isinstance(payload, tuple) else (payload, b'')
@@ -962,7 +1032,7 @@ class Addr(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'addr',
+            command_name=COMMAND_NAME_ADDR,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -973,7 +1043,7 @@ class Addr(MSG):
     @staticmethod
     def deserialize(data: bytes) -> 'Addr':
         message_header, data = MessageHeader.deserialize(data)
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'addr'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_ADDR):
             raise ValueError('Command name is not addr')
         payload = Addr_.deserialize(data)
         payload, data = payload if isinstance(payload, tuple) else (payload, b'')
@@ -1048,7 +1118,7 @@ class GetAddr(MSG):
         self.payload = GetAddr_()
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'getaddr',
+            command_name=COMMAND_NAME_GETADDR,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -1061,7 +1131,7 @@ class GetAddr(MSG):
         message_header = MessageHeader.deserialize(data)
         message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
         
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'getaddr'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETADDR):
             raise ValueError('Command name is not getaddr')
         
         payload = GetAddr_.deserialize(data)
@@ -1098,7 +1168,7 @@ class Ping(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'ping',
+            command_name=COMMAND_NAME_PING,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -1110,7 +1180,7 @@ class Ping(MSG):
     def deserialize(data: bytes) -> 'Ping':
         message_header, data = MessageHeader.deserialize(data)
         
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'ping'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_PING):
             raise ValueError('Command name is not ping')
         
         payload = Ping_.deserialize(data)
@@ -1177,7 +1247,7 @@ class Pong(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'pong',
+            command_name=COMMAND_NAME_PONG,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -1190,7 +1260,7 @@ class Pong(MSG):
         message_header = MessageHeader.deserialize(data)
         message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
 
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'pong'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_PONG):
             raise ValueError('Command name is not pong')
         
         payload = Pong_.deserialize(data)
@@ -1226,7 +1296,7 @@ class SendHeaders(MSG):
         self.payload = SendHeaders_()
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'sendheaders',
+            command_name=COMMAND_NAME_SENDHEADERS,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -1239,7 +1309,7 @@ class SendHeaders(MSG):
         message_header = MessageHeader.deserialize(data)
         message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
         
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'sendheaders'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_SENDHEADERS):
             raise ValueError('Command name is not sendheaders')
         
         payload = SendHeaders_.deserialize(data)
@@ -1273,7 +1343,7 @@ class VerAck(MSG):
         self.payload = VerAck_()
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'verack',
+            command_name=COMMAND_NAME_VERACK,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -1286,7 +1356,7 @@ class VerAck(MSG):
         message_header = MessageHeader.deserialize(data)
         message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
         
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'verack'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_VERACK):
             raise ValueError('Command name is not verack')
         
         payload = VerAck_.deserialize(data)
@@ -1343,7 +1413,7 @@ class Version(MSG):
         )
         self.message_header = MessageHeader(
             start_string=start_string,
-            command_name=b'version',
+            command_name=COMMAND_NAME_VERSION,
             payload_size=len(self.payload),
             checksum=self.payload._hash()[:len(CHECKSUM_SERIALIZE)]
         )
@@ -1355,7 +1425,7 @@ class Version(MSG):
     def deserialize(data: bytes) -> 'Version':
         message_header, data = MessageHeader.deserialize(data)
 
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'version'):
+        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_VERSION):
             raise ValueError('Command name is not version')
         
         payload = Version_.deserialize(data)

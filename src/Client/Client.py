@@ -9,7 +9,7 @@ import sys
 sys.path.append('.')
 import socket
 from time import time
-from src.PeerToPeerNetwork.Msg import Version
+from src.PeerToPeerNetwork.Msg import Version, PAYLOAD
 from src.PeerToPeerNetwork.P2PNetwork import Peer, RecvPeer, TransPeer
 from src.PeerToPeerNetwork.NetConf.Global import IDENTIFIER_SERIALIZE
 from hashlib import sha256
@@ -63,9 +63,11 @@ class CLIENT(object):
     async def act(self) -> None:
         while True:
             data: bytes = self.actSequence.get()
-            # action = ACT.deserialize(data)
-            # self.logger.info(f'Received a action: {action}')
-            # action.act(self)
+            payload = PAYLOAD.toPayload(data)
+            payload, data = payload if not isinstance(payload, tuple) else (payload, b'')
+            if data:
+                self.logger.warning(f'Received a payload with more {len(data)}.L.bytes')
+            payload.act(self)
             self.logger.info(f'Received a action: {data.hex()}')
 
     def ready_state(self,
