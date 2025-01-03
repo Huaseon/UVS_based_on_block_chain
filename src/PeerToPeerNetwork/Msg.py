@@ -13,7 +13,7 @@ from src.utils.data import compactSize
 from typing import TypeAlias
 from src.BlockChain.block import BLOCK, BlockHeader
 from src.PeerToPeerNetwork.NetConf.Global import *
-from src.Transaction.transaction import TRANSACTION, TxIn, TxOut, outpoint, AuditMission
+from src.Transaction.transaction import TRANSACTION, TxIn, TxOut, outpoint
 from abc import ABC, abstractmethod
 
 # 消息类
@@ -37,6 +37,64 @@ class MSG(ABC):
     @abstractmethod
     def __str__(self) -> str:
         pass
+
+    @staticmethod
+    def toMSG(data: bytes) -> 'MSG':
+        message_header = MessageHeader.deserialize(data)
+        message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
+        message = MSG._toMSG(message_header, data)
+        message, data = message if isinstance(message, tuple) else (message, b'')
+        if message_header.checksum != message.payload._hash()[:len(CHECKSUM_SERIALIZE)]:
+            raise ValueError('Checksum is not correct')
+        return message if not data else (
+            message,
+            data
+        )
+    
+    @staticmethod
+    def _toMSG(
+        message_header: 'MessageHeader',
+        data: bytes
+    ) -> 'MSG':
+        data = message_header.serialize() + data
+        command_name = message_header.command_name
+        if command_name == case_block:
+            return Block.deserialize(data)
+        elif command_name == case_getblocks:
+            return GetBlocks.deserialize(data)
+        elif command_name == case_inv:
+            return Inv.deserialize(data)
+        elif command_name == case_getdata:
+            return GetData.deserialize(data)
+        elif command_name == case_getheaders:
+            return GetHeaders.deserialize(data)
+        elif command_name == case_headers:
+            return Headers.deserialize(data)
+        elif command_name == case_merkleblock:
+            return MerkleBlock.deserialize(data)
+        elif command_name == case_mempool:
+            return Mempool.deserialize(data)
+        elif command_name == case_tx:
+            return Tx.deserialize(data)
+        elif command_name == case_notfound:
+            return Notfound.deserialize(data)
+        elif command_name == case_addr:
+            return Addr.deserialize(data)
+        elif command_name == case_getaddr:
+            return GetAddr.deserialize(data)
+        elif command_name == case_ping:
+            return Ping.deserialize(data)
+        elif command_name == case_pong:
+            return Pong.deserialize(data)
+        elif command_name == case_sendheaders:
+            return SendHeaders.deserialize(data)
+        elif command_name == case_verack:
+            return VerAck.deserialize(data)
+        elif command_name == case_version:
+            return Version.deserialize(data)
+        else:
+            raise ValueError('Command name is not correct')
+
 
 # PAYLOAD
 class PAYLOAD(ABC):
@@ -70,66 +128,7 @@ class PAYLOAD(ABC):
     # def act(self, client: 'CLIENT') -> None:
     #     pass
 
-    @staticmethod
-    def toPayload(data: bytes) -> 'PAYLOAD':
-        message_header = MessageHeader.deserialize(data)
-        message_header, data = message_header if isinstance(message_header, tuple) else (message_header, b'')
-        payload = PAYLOAD._payload(message_header.command_name, data)
-        payload, data = payload if isinstance(payload, tuple) else (payload, b'')
-
-        if message_header.checksum != payload._hash()[:len(CHECKSUM_SERIALIZE)]:
-            raise ValueError('Checksum is not correct')
-        
-        return payload if not data else (
-            payload,
-            data
-        )
     
-    @staticmethod
-    def _payload(
-        command_name: bytes,
-        data: bytes
-    ) -> 'PAYLOAD':
-        match command_name:
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_BLOCK):
-                return Block.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETBLOCKS):
-                return GetBlocks.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_INV):
-                return Inv.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETDATA):
-                return GetData.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETHEADERS):
-                return GetHeaders.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_HEADERS):
-                return Headers.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_MERKLEBLOCK):
-                return MerkleBlock.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_MEMPOOL):
-                return Mempool.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_TX):
-                return TRANSACTION.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_NOTFOUND):
-                return Notfound.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_ADDR):
-                return Addr.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_GETADDR):
-                return GetAddr.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_PING):
-                return Ping.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_PONG):
-                return Pong.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_SENDHEADERS):
-                return SendHeaders.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_VERACK):
-                return VerAck.deserialize(data)
-            case COMMAND_NAME_SERIALIZE.serialize(COMMAND_NAME_VERSION):
-                return Version.deserialize(data)
-            case _:
-                raise ValueError('Command name is not correct')
-        
-        if message_header.command_name != COMMAND_NAME_SERIALIZE.serialize(b'block'):
-            raise ValueError('Command name is not block')
         
 
 # 定义消息报头类

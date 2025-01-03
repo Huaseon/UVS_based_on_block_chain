@@ -10,6 +10,7 @@ sys.path.append('.')
 import socket
 from asyncio import LifoQueue, run
 import logging
+from src.PeerToPeerNetwork.Msg import MSG
 
 # 定义Peer类
 class Peer(object):
@@ -50,13 +51,15 @@ class TransPeer(Peer):
     ) -> None:
         super().__init__(name=name, IP_address=IP_address, port=port, listen=listen, sequence=mesSequence)
         self.actSequence = actSequence
-        run(self.responce())
+        # run(self.responce())
     
     async def responce(self):
         while True:
-            data, addr = self.sequence.get()
-            message = MSG.deserialize(data)
-            self.logger.info(f'Received a message from {addr}, and the message is {message}')
+            data, addr = await self.sequence.get()
+            self.logger.info(f'Received a {len(data)}.L.message from {addr}')
+            message = MSG.toMSG(data)
+            message, data = message if isinstance(message, tuple) else (message, b'')
+            # 实现responce方法
             res = message.responce(addr)
             if isinstance(res, tuple):
                 self.skt.connect(res[0])
@@ -66,7 +69,7 @@ class TransPeer(Peer):
             else:
                 self.actSequence.put_nowait(res)
                 self.logger.info(f'Put a {len(res)}.L.message into the actSequence')
-            
+            self.sequence.task_done()
 
 
 
@@ -81,7 +84,7 @@ class RecvPeer(Peer):
         mesSequence: LifoQueue
     ) -> None:
         super().__init__(name=name, IP_address=IP_address, port=port, listen=listen, sequence=mesSequence)
-        run(self.recv())
+        # run(self.recv())
         
     async def recv(self):
         while True:
