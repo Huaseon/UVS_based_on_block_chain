@@ -10,127 +10,113 @@ sys.path.append('.')
 import socket
 from time import time
 from src.PeerToPeerNetwork.Msg import Version
+from src.PeerToPeerNetwork.P2PNetwork import Peer, RecvPeer, TransPeer
+from src.PeerToPeerNetwork.NetConf.Global import IDENTIFIER_SERIALIZE
 from hashlib import sha256
-import threading
+from asyncio import LifoQueue, run
 import logging
-logging.basicConfig(filename='logs.log', level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S', encoding='utf8')
+logging.basicConfig(filename='logs/logs.log', level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S', encoding='utf8')
 
 class CLIENT(object):
     def __init__(self,
-        client_start_string: bytes | int, client_version: int, client_services: int,
-        client_recv_IP_address: str, client_recv_port: int, client_trans_IP_address: str,
-        client_trans_port: int, client_nonce: int, client_start_height: int, client_listen: int | tuple
+        start_string: bytes | int, version: int, client_services: int, 
+        client_identifier: int, client_start_height: int, client_listen: int | tuple,
+        recv_services: int, recv_IP_address: str, recv_port: int,
+        trans_services: int, trans_IP_address: str, trans_port: int
     ) -> None:
-        if not self.ready_log(name=str(client_nonce)):
-            raise Exception('Failed to initialize the logger.')
-        self.logger.info(f'Initializing the client with {client_nonce}...')
+        if not self.ready(
+            start_string=start_string, version=version, client_services=client_services,
+            client_identifier=client_identifier, client_start_height=client_start_height, client_listen=client_listen,
+            recv_services=recv_services, recv_IP_address=recv_IP_address, recv_port=recv_port,
+            trans_services=trans_services, trans_IP_address=trans_IP_address, trans_port=trans_port
+        ):
+            raise Exception('Failed to initialize the client.')
+        self.logger.info('Client is ready.')
+        run(self.act())
+
+    def ready(self,
+        start_string: bytes | int, version: int, client_services: int, 
+        client_identifier: int, client_start_height: int, client_listen: int | tuple,
+        recv_services: int, recv_IP_address: str, recv_port: int,
+        trans_services: int, trans_IP_address: str, trans_port: int
+    ) -> bool:
+        if not self.ready_state(
+            start_string=start_string, version=version, client_services=client_services,
+            identifier=client_identifier, start_height=client_start_height, recv_services=recv_services,
+            recv_IP_address=recv_IP_address, recv_port=recv_port, trans_services=trans_services,
+            trans_IP_address=trans_IP_address, trans_port=trans_port
+        ):
+            return False
+        
         if not self.ready_recv(
-            recv_IP_address=client_recv_IP_address, 
-            recv_port=client_recv_port, listen=client_listen
+            listen=client_listen
         ):
-            raise Exception('Failed to initialize the receiver.')
-        self.logger.info(f'Initializing the receiver with {client_nonce}...')
+            return False
+        
         if not self.ready_trans(
-            trans_IP_address=client_trans_IP_address,
-            trans_port=client_trans_port, listen=client_listen
+            listen=client_listen
         ):
-            raise Exception('Failed to initialize the transmitter.')
-        self.logger.info(f'Initializing the transmitter with {client_nonce}...')
-        if not self.ready_version(
-            start_string=client_start_string, version=client_version, services=client_services,
-            timestamp=int(time()), addr_recv_services=client_services, addr_recv_IP_address=client_recv_IP_address,
-            addr_recv_port=client_recv_port, addr_trans_services=client_services, addr_trans_IP_address=client_trans_IP_address,
-            addr_trans_port=client_trans_port, nonce=client_nonce, start_height=client_start_height
-        ):
-            raise Exception('Failed to initialize the version.')
-        self.logger.info(f'Initializing the version with {client_nonce}...')
-        if not self.ready_state():
-            raise Exception('Failed to initialize the state.')
-        self.logger.info(f'Initializing the state with {client_nonce}...')
-        self.receiver = threading.Thread(target=self.recving)
-        self.receiver.start()
-        
-    
-    def ready_log(self, name: str):
-        self.logger = logging.getLogger(name=name)
-        self.logger.info(f'Initializing the logger for {name}')
-
-        self.recv_logger = logging.getLogger(name=f'{name}:recv')
-        self.recv_logger.info(f'Initializing the logger for {name}:recv')
-        
-        self.trans_logger = logging.getLogger(name=f'{name}_trans')
-        self.trans_logger.info(f'Initializing the logger for {name}_trans')
-        
-        return True
-
-    def ready_recv(self,
-        recv_IP_address: str,
-        recv_port: int,
-        listen: int | tuple[int, int]
-    ):
-        self.recv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.recv.bind((recv_IP_address, recv_port))
-        self.recv.listen(listen if isinstance(listen, int) else listen[0])
-        self.recv_logger.info(f'Listening on {recv_IP_address}:{recv_port}')
+            return False
 
         return True
 
-    def ready_trans(self,
-        trans_IP_address: str,
-        trans_port: int,
-        listen: int | tuple[int, int]                
-    ):
-        self.trans = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.trans.bind((trans_IP_address, trans_port))
-        self.trans.listen(listen if isinstance(listen, int) else listen[-1])
-        self.trans_logger.info(f'Listening on {trans_IP_address}:{trans_port}')
-        return True
-    
-    def ready_version(self,
-        start_string: bytes | int, version: int, services: int, 
-        timestamp: int, addr_recv_services: int, addr_recv_IP_address: str,
-        addr_recv_port: int, addr_trans_services: int, addr_trans_IP_address: str,
-        addr_trans_port: int, nonce: int, start_height: int
-    ):
+    async def act(self) -> None:
+        while True:
+            data: bytes = self.actSequence.get()
+            # action = ACT.deserialize(data)
+            # self.logger.info(f'Received a action: {action}')
+            # action.act(self)
+            self.logger.info(f'Received a action: {data.hex()}')
+
+    def ready_state(self,
+        start_string: bytes | int, version: int, client_services: int,
+        identifier: int, start_height: int, recv_services: int,
+        recv_IP_address: str, recv_port: int, trans_services: int,
+        trans_IP_address: str, trans_port: int
+    ) -> bool:
+        self.actSequence = LifoQueue()
+        self.mesSequence = LifoQueue()
+        self.logger = logging.getLogger(name=IDENTIFIER_SERIALIZE.serialize(identifier).hex())
         self.version = Version(
             start_string=start_string,
             version=version,
-            services=services,
-            timestamp=timestamp,
-            addr_recv_services=addr_recv_services,
-            addr_recv_IP_address=addr_recv_IP_address,
-            addr_recv_port=addr_recv_port,
-            addr_trans_services=addr_trans_services,
-            addr_trans_IP_address=addr_trans_IP_address,
-            addr_trans_port=addr_trans_port,
-            nonce=nonce,
+            services=client_services,
+            timestamp=int(time()),
+            addr_recv_services=recv_services,
+            addr_recv_IP_address=recv_IP_address,
+            addr_recv_port=recv_port,
+            addr_trans_services=trans_services,
+            addr_trans_IP_address=trans_IP_address,
+            addr_trans_port=trans_port,
+            identifier=identifier,
             start_height=start_height
         )
-        self.logger.info(f'Version: {self.version}')
-        return True
-    
-    def ready_state(self):
-        self.messages = []
         return True
 
-    def recving(self):
-        while True:
-            conn, addr = self.recv.accept()
-            self.recv_logger.info(f'Connected by {addr}')
-            data = b''
-            while _:=conn.recv(1024):
-                data += _
-            else:
-                self.messages.append(data)
-            self.recv_logger.info(f'Received: {len(data)}_bytes')
-            conn.close()
+    def ready_recv(self,
+            listen: int | tuple[int, int]
+        ) -> bool:
+        self.recv = RecvPeer(
+            identifier=self.logger.name + ':recv',
+            IP_address=self.version.payload.addr_recv_IP_address,
+            port=self.version.payload.addr_recv_port,
+            listen=listen if isinstance(listen, int) else listen[0],
+            mesSequence=self.mesSequence
+        )
+        return True
     
-    def response(self):
-        while True:
-            while not len(self.messages):
-                pass
-            message = self.messages.pop()
-            
-            if self.messages:
-                data = self.messages.pop(0)
-        pass
+    def ready_trans(self,
+            listen: int | tuple[int, int]
+    ) -> bool:
+        self.trans = TransPeer(
+            identifier=self.logger.name + ':trans',
+            IP_address=self.version.payload.addr_trans_IP_address,
+            port=self.version.payload.addr_trans_port,
+            listen=listen if isinstance(listen, int) else listen[-1],
+            mesSequence=self.mesSequence,
+            actSequence=self.actSequence
+        )
+        return True
+
+
+    

@@ -14,6 +14,57 @@ from typing import TypeAlias
 from src.BlockChain.block import BLOCK, BlockHeader
 from src.PeerToPeerNetwork.NetConf.Global import *
 from src.Transaction.transaction import TRANSACTION, TxIn, TxOut, outpoint, AuditMission
+from abc import ABC, abstractmethod
+
+# 消息类
+class MSG(ABC):
+    @abstractmethod
+    def __init__(self,
+        start_string: bytes | int,
+        **kwargs
+    ):
+        pass
+    
+    @abstractmethod
+    def serialize(self) -> bytes:
+        pass
+
+    @abstractmethod
+    @staticmethod
+    def deserialize(data: bytes) -> 'MSG':
+        pass
+
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
+
+# PAYLOAD
+class PAYLOAD(ABC):
+    
+    @abstractmethod
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    @abstractmethod
+    def serialize(self) -> bytes:
+        pass
+    
+    @abstractmethod
+    @staticmethod
+    def deserialize(data: bytes) -> 'PAYLOAD':
+        pass
+    
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
+
+    @abstractmethod
+    def __len__(self) -> int:
+        pass
+    
+    @abstractmethod
+    def _hash(self) -> bytes:
+        pass
 
 # 定义消息报头类
 class MessageHeader(object):
@@ -26,7 +77,7 @@ class MessageHeader(object):
         self.checksum = checksum
         self.payload_size = payload_size
         self.command_name = command_name
-        self.start_string = start_string if isinstance(start_string, bytes) else start_string.to_bytes(4, 'big')
+        self.start_string = start_string if isinstance(start_string, bytes) else start_string.to_bytes(len(START_STRING_SERIALIZE), 'big')
     def serialize(self):
         return MESSAGE_HEADER_SERIALIZE.serialize(
             self.start_string,
@@ -96,8 +147,9 @@ class INVENTORY(object):
     def __len__(self) -> int:
         return len(self.serialize())
 
+
 # 定义Block消息类
-class Block(object):
+class Block(MSG):
     def __init__(self,
         start_string: bytes | int,
         block: BLOCK
@@ -145,7 +197,7 @@ class Block(object):
         return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Block_>": {payload}\n}}'
 
 # 定义Payload_Block消息类
-class Block_(object):
+class Block_(PAYLOAD):
     def __init__(self,
         block: BLOCK
     ):
@@ -178,7 +230,7 @@ class Block_(object):
     
 
 # 定义GetBlocks消息类
-class GetBlocks(object):
+class GetBlocks(MSG):
     def __init__(self,
         start_string: bytes | int,
         version: int,
@@ -231,7 +283,7 @@ class GetBlocks(object):
         return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<GetBlocks_>": {payload}\n}}'
     
 # 定义Payload_GetBlocks消息类
-class GetBlocks_(object):
+class GetBlocks_(PAYLOAD):
     def __init__(self,
         version: int,
         block_header_hashes: list[bytes],
@@ -286,7 +338,7 @@ class GetBlocks_(object):
         return sha256(self.serialize()).digest()
 
 # 定义Inv消息类
-class Inv(object):
+class Inv(MSG):
     def __init__(self,
         start_string: bytes | int,
         inventory: list[INVENTORY]
@@ -330,7 +382,7 @@ class Inv(object):
         return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Inv_>": {payload}\n}}'
 
 # 定义Payload_Inv消息类
-class Inv_(object):
+class Inv_(PAYLOAD):
     def __init__(self,
         inventory: list[INVENTORY]
     ):
@@ -375,7 +427,7 @@ class Inv_(object):
         return sha256(self.serialize()).digest()
 
 # 定义GetData消息类
-class GetData(object):
+class GetData(MSG):
     def __init__(self,
         start_string: bytes | int,
         inventory: list[INVENTORY]
@@ -426,7 +478,7 @@ class GetData(object):
 GetData_: TypeAlias = Inv_
 
 # 定义GetHeaders消息类
-class GetHeaders(object):
+class GetHeaders(MSG):
     def __init__(self,
         start_string: bytes | int,
         version: int,
@@ -485,7 +537,7 @@ class GetHeaders(object):
 GetHeaders_: TypeAlias = GetBlocks_
 
 # 定义Headers消息类
-class Headers(object):
+class Headers(MSG):
     def __init__(self,
         start_string: bytes | int,
         headers: list[BlockHeader]             
@@ -533,7 +585,7 @@ class Headers(object):
         return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Headers_>": {payload}\n}}'
 
 # 定义Payload_Headers消息类
-class Headers_(object):
+class Headers_(PAYLOAD):
     def __init__(self,
         headers: list[BlockHeader]
     ):
@@ -577,8 +629,8 @@ class Headers_(object):
     def _hash(self) -> bytes:
         return sha256(self.serialize()).digest()
 
-# 定义Payload_EMPTY消息
-class EMPTY_(object):
+# 定义Payload_EMPTY消息类
+class EMPTY_(PAYLOAD):
     
     def __init__(self):
         pass
@@ -603,7 +655,7 @@ class EMPTY_(object):
         return sha256(sha256(self.serialize()).digest()).digest()
 
 # 定义Mempool消息类
-class Mempool(object):
+class Mempool(MSG):
     def __init__(self,
         start_string: bytes | int
     ):
@@ -650,7 +702,7 @@ class Mempool(object):
 Mempool_: TypeAlias = EMPTY_
 
 # 定义MerkleBlock消息类
-class MerkleBlock(object):
+class MerkleBlock(MSG):
     def __init__(self,
         start_string: bytes | int,
         block_header: BlockHeader,
@@ -706,7 +758,7 @@ class MerkleBlock(object):
         return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<MerkleBlock_>": {payload}\n}}'
 
 # 定义Payload_MerkleBlock消息类
-class MerkleBlock_(object):
+class MerkleBlock_(PAYLOAD):
     def __init__(self,
         block_header: 'BlockHeader',
         transaction_count: int,
@@ -776,7 +828,7 @@ class MerkleBlock_(object):
         return sha256(self.serialize()).digest()
 
 # 定义Tx消息类
-class Tx(object):
+class Tx(MSG):
     def __init__(self,
         start_string: bytes | int,
         transaction: 'TRANSACTION'
@@ -820,7 +872,7 @@ class Tx(object):
         return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Tx_>": {payload}\n}}'
 
 # 定义Payload_Tx消息类
-class Tx_(object):
+class Tx_(PAYLOAD):
     def __init__(self,
         transaction: TRANSACTION
     ) -> None:
@@ -852,7 +904,7 @@ class Tx_(object):
         return sha256(self.serialize()).digest()
 
 # 定义Notfound消息
-class Notfound(object):
+class Notfound(MSG):
     def __init__(self,
         start_string: bytes | int,
         inventory: list[INVENTORY]
@@ -900,7 +952,7 @@ class Notfound(object):
 Notfound_: TypeAlias = Inv_
 
 # 定义Addr消息
-class Addr(object):
+class Addr(MSG):
     def __init__(self,
          start_string: bytes | int,
          IP_addresses: list[NetworkIPAddress]        
@@ -944,7 +996,7 @@ class Addr(object):
         return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Addr_>: {payload}\n}}'
 
 # 定义Payload_Addr消息
-class Addr_(object):
+class Addr_(PAYLOAD):
     def __init__(self,
         IP_addresses: list[NetworkIPAddress]
     ):
@@ -989,7 +1041,7 @@ class Addr_(object):
         return sha256(self.serialize()).digest()
 
 # 定义GetAddr消息
-class GetAddr(object):
+class GetAddr(MSG):
     def __init__(self,
         start_string: bytes | int
     ):
@@ -1036,7 +1088,7 @@ class GetAddr(object):
 GetAddr_: TypeAlias = EMPTY_
 
 # 定义Ping消息
-class Ping(object):
+class Ping(MSG):
     def __init__(self,
         start_string: bytes | int,
         nonce: int
@@ -1084,7 +1136,7 @@ class Ping(object):
         return f'{{\n\t"message_header:<MessageHeader>": {message_header},\n\t"payload:<Ping_>: {payload}\n}}'
 
 # 定义Payload_Ping消息
-class Ping_(object):
+class Ping_(PAYLOAD):
     def __init__(self,
         nonce: int
     ):
@@ -1115,7 +1167,7 @@ class Ping_(object):
         return sha256(self.serialize()).digest()
 
 # 定义Pong消息
-class Pong(object):
+class Pong(MSG):
     def __init__(self,
         start_string: bytes | int,
         nonce: int        
@@ -1167,7 +1219,7 @@ class Pong(object):
 Pong_: TypeAlias = Ping_
 
 # 定义SendHeaders消息
-class SendHeaders(object):
+class SendHeaders(MSG):
     def __init__(self,
         start_string: bytes | int,
     ):
@@ -1214,7 +1266,7 @@ class SendHeaders(object):
 SendHeaders_: TypeAlias = EMPTY_
 
 # 定义VerAck消息
-class VerAck(object):
+class VerAck(MSG):
     def __init__(self,
         start_string: bytes | int
     ):
@@ -1261,7 +1313,7 @@ class VerAck(object):
 VerAck_: TypeAlias = EMPTY_
 
 # 定义Version消息
-class Version(object):
+class Version(MSG):
     def __init__(self,
         start_string: bytes | int,
         version: int,
@@ -1273,7 +1325,7 @@ class Version(object):
         addr_trans_services: int,
         addr_trans_IP_address: str,
         addr_trans_port: int,
-        nonce: int,
+        identifier: int,
         start_height: int,
     ):
         self.payload = Version_(
@@ -1286,7 +1338,7 @@ class Version(object):
             addr_trans_services=addr_trans_services,
             addr_trans_IP_address=addr_trans_IP_address,
             addr_trans_port=addr_trans_port,
-            nonce=nonce,
+            identifier=identifier,
             start_height=start_height
         )
         self.message_header = MessageHeader(
@@ -1323,7 +1375,7 @@ class Version(object):
             addr_trans_services=payload.addr_trans_services,
             addr_trans_IP_address=payload.addr_trans_IP_address,
             addr_trans_port=payload.addr_trans_port,
-            nonce=payload.nonce,
+            identifier=payload.identifier,
             start_height=payload.start_height
         ) if not data else (
             Version(
@@ -1337,7 +1389,7 @@ class Version(object):
                 addr_trans_services=payload.addr_trans_services,
                 addr_trans_IP_address=payload.addr_trans_IP_address,
                 addr_trans_port=payload.addr_trans_port,
-                nonce=payload.nonce,
+                identifier=payload.identifier,
                 start_height=payload.start_height
             ), data
         )
@@ -1349,7 +1401,7 @@ class Version(object):
         
 
 # 定义Payload_Version消息
-class Version_(object):
+class Version_(PAYLOAD):
     def __init__(self,
         version: int,
         services: int,
@@ -1360,11 +1412,11 @@ class Version_(object):
         addr_trans_services: int,
         addr_trans_IP_address: str,
         addr_trans_port: int,
-        nonce: int,
+        identifier: int,
         start_height: int,
     ):
         self.start_height = start_height
-        self.nonce = nonce
+        self.identifier = identifier
         self.addr_trans_port = addr_trans_port
         self.addr_trans_IP_address = addr_trans_IP_address
         self.addr_trans_services = addr_trans_services
@@ -1385,12 +1437,12 @@ class Version_(object):
         addr_trans_services = SERVICES_SERIALIZE.serialize(self.addr_trans_services)
         addr_trans_IP_address = IP_SERIALIZE.serialize(self.addr_trans_IP_address)
         addr_trans_port = PORT_SERIALIZE.serialize(self.addr_trans_port)
-        nonce = NONCE_SERIALIZE.serialize(self.nonce)
+        identifer = IDENTIFIER_SERIALIZE.serialize(self.identifier)
         start_height = START_HEIGHT_SERIALIZE.serialize(self.start_height)
         return version + services + timestamp \
             + addr_recv_services + addr_recv_IP_address + addr_recv_port \
             + addr_trans_services + addr_trans_IP_address + addr_trans_port \
-            + nonce + start_height
+            + identifer + start_height
     
     @staticmethod
     def deserialize(data: bytes) -> 'Version_':
@@ -1403,7 +1455,7 @@ class Version_(object):
         addr_trans_services, data = SERVICES_SERIALIZE.deserialize(data)
         addr_trans_IP_address, data = IP_SERIALIZE.deserialize(data)
         addr_trans_port, data = PORT_SERIALIZE.deserialize(data)
-        nonce, data = NONCE_SERIALIZE.deserialize(data)
+        identifier, data = IDENTIFIER_SERIALIZE.deserialize(data)
         start_height, data = START_HEIGHT_SERIALIZE.deserialize(data)
         return Version_(
             version=version,
@@ -1415,7 +1467,7 @@ class Version_(object):
             addr_trans_services=addr_trans_services,
             addr_trans_IP_address=addr_trans_IP_address,
             addr_trans_port=addr_trans_port,
-            nonce=nonce,
+            identifier=identifier,
             start_height=start_height
         ) if not data else (
             Version_(
@@ -1428,7 +1480,7 @@ class Version_(object):
                 addr_trans_services=addr_trans_services,
                 addr_trans_IP_address=addr_trans_IP_address,
                 addr_trans_port=addr_trans_port,
-                nonce=nonce,
+                identifier=identifier,
                 start_height=start_height
             ), data
         )
@@ -1449,17 +1501,18 @@ class Version_(object):
         addr_trans_services = SERVICES_SERIALIZE.serialize(self.addr_trans_services).hex()
         addr_trans_IP_address = IP_SERIALIZE.serialize(self.addr_trans_IP_address).hex()
         addr_trans_port = PORT_SERIALIZE.serialize(self.addr_trans_port).hex()
-        nonce = NONCE_SERIALIZE.serialize(self.nonce).hex()
+        idnetifier = IDENTIFIER_SERIALIZE.serialize(self.identifier).hex()
         start_height = START_HEIGHT_SERIALIZE.serialize(self.start_height).hex()
         return f'''{{\n\t"version:<uint32_t>": {version},\n\t"services:<uint64_t>": {services},\n\t"timestamp:<uint64_t>": {timestamp}\
             ,\n\t"addr_recv_services:<uint64_t>": {addr_recv_services},\n\t"addr_recv_IP_address:<char[16]>": {addr_recv_IP_address},\n\t"addr_recv_port:<uint16_t>": {addr_recv_port}\
             ,\n\t"addr_trans_services:<uint64_t>": {addr_trans_services},\n\t"addr_trans_IP_address:<char[16]>": {addr_trans_IP_address},\n\t"addr_trans_port:<uint16_t>": {addr_trans_port}\
-            ,\n\t"conce:<uint64_t>": {nonce},\n\t"start_height:<uint32_t>": {start_height}\n}}'''
+            ,\n\t"conce:<uint64_t>": {idnetifier},\n\t"start_height:<uint32_t>": {start_height}\n}}'''
 
 
 if __name__ == "__main__":
     # 模块测试
     from src.PeerToPeerNetwork.NetConf.LocalNet import *
+
     msg_header = MessageHeader(
         start_string=START_STRING,
         command_name=b'block',
@@ -1706,7 +1759,7 @@ if __name__ == "__main__":
         addr_trans_services=NODE_NETWORK,
         addr_trans_IP_address=LOCAL_IP,
         addr_trans_port=next(LOCAL_PORT),
-        nonce=0,
+        identifier=0,
         start_height=0
     )
     print(Version.deserialize(version.serialize()))

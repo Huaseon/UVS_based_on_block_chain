@@ -9,13 +9,17 @@ import sys
 sys.path.append('.')
 from src.utils.data import SERIALIZE
 import struct
+from abc import ABC, abstractmethod
 
 # 哈希（散列）序列化
 HASH_SERIALIZE = SERIALIZE('<32s')
 # 起始字符串序列化格式
 START_STRING_SERIALIZE = SERIALIZE('<4s')
+
+# COMMAND_NAME LENGTH
+COMMAND_NAME_LENGTH = 12
 # 命令名序列化格式
-COMMAND_NAME_SERIALIZE = SERIALIZE('<12s')
+COMMAND_NAME_SERIALIZE = SERIALIZE(f'<{COMMAND_NAME_LENGTH}s')
 # 负载大小序列化格式
 PAYLOAD_SIZE_SERIALIZE = SERIALIZE('<I')
 # 校验和序列化格式
@@ -54,6 +58,9 @@ TX_COUNT_ON_HEADERS = 0x00
 # 随机数序列化
 NONCE_SERIALIZE = SERIALIZE('<Q')
 
+# IDENTIFIER序列化
+IDENTIFIER_SERIALIZE = SERIALIZE('<Q')
+
 # Payload为空
 EMPTY_PAYLOAD = b''
 
@@ -80,6 +87,9 @@ NODE_NETWORK_LIMITED = 0x20
 
 # 端口序列化
 PORT_SERIALIZE = SERIALIZE('>H')
+
+
+    
 
 # FLAGS
 class FLAGS(int):
